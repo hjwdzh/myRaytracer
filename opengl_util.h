@@ -18,3 +18,4 @@ void data_to_uniform(float* t, int d, int size, const char* name) {
 		break;
 	}
 }
+

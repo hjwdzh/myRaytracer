@@ -1,7 +1,9 @@
 #version 120
 // Input vertex data, different for all executions of this shader.
 attribute vec3 vertex;
-uniform vec3 color;
+uniform vec3 camera;
+uniform float viewplane_dis;
+uniform float viewplane_scale;
 varying vec2 pixel;
 void main(){
 	pixel.xy = vertex.xy;
