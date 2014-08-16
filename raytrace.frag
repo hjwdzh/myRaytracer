@@ -1,8 +1,12 @@
 #version 120
 
+#define SAMPLE_SIZE 16
+
+uniform vec2 samples[SAMPLE_SIZE];
+
 uniform vec3 camera;
 uniform float viewplane_dis;
-uniform float viewplane_scale;
+uniform vec2 viewplane_scale;
 
 uniform sampler1D meshSampler;
 uniform int num_triangles;
@@ -68,9 +72,15 @@ vec4 hit(vec3 ray_o, vec3 ray_t) {
 
 void main() {
 	// Output color = red 
-	vec3 ray_o = vec3(pixel.x,pixel.y,0);//camera;
-	vec3 ray_t = normalize(viewplane_dis * vec3(0,0,1)+viewplane_scale * vec3(pixel.x,pixel.y,0));
-	gl_FragColor = hit(ray_o, ray_t);
+	vec4 color = vec4(0,0,0,0);
+	vec3 ray_o = camera;
+//	int i = 0;
+	for (int i = 0; i < SAMPLE_SIZE; ++i) {
+		vec2 p = pixel * viewplane_scale + samples[i] / (480.0 * viewplane_scale);
+		vec3 ray_t = normalize(viewplane_dis * vec3(0,0,1)+vec3(p.x,p.y,0));
+		color = color + hit(ray_o, ray_t);
+	}
+	gl_FragColor = color / SAMPLE_SIZE;
 //	gl_FragColor = vec4(0,0,0,1);
 //	gl_FragColor.r = texture1D(meshSampler,(pixel.x+1)/2).r;
 }
