@@ -2,10 +2,14 @@
 #include <GLUT/glut.h>
 #include "shader.h"
 #include "world.h"
+#include "glm/glm.hpp"
 using namespace std;
 
 int g_Width = 600, g_Height = 480;
 float g_nearPlane = 0.1, g_farPlane = 5000;
+
+glm::vec3 camera(0,0,-2), camera_up(0,1,0), camera_lookat(0,0,1);
+
 struct timeval last_idle_time, time_now;
 enum {
     MENU_LIGHTING = 1,
@@ -105,11 +109,32 @@ void SelectFromMenu(int idCommand)
 
 void Keyboard(unsigned char key, int x, int y)
 {
+  glm::vec3 camera_x = glm::cross(camera_lookat, camera_up);;
   switch (key)
   {
   case 27:             // ESCAPE key
 	  exit (0);
 	  break;
+  case 'w':
+    camera_up = glm::normalize(camera_up - (float)(tan(5 / 180.0 * 3.1415926)) * camera_lookat);
+    camera_lookat = glm::cross(camera_up, camera_x);
+    break;
+  case 's':
+    camera_up = glm::normalize(camera_up + (float)(tan(5 / 180.0 * 3.1415926)) * camera_lookat);
+    camera_lookat = glm::cross(camera_up, camera_x);
+    break;
+  case 'a':
+    camera_lookat = glm::normalize(camera_lookat + (float)(tan(5 / 180.0 * 3.1415926)) * camera_x);
+    break;
+  case 'd':
+    camera_lookat = glm::normalize(camera_lookat - (float)(tan(5 / 180.0 * 3.1415926)) * camera_x);
+    break;
+  case 'f':
+    camera = camera + 0.1f * camera_lookat;
+    break;
+  case 'b':
+    camera = camera - 0.1f * camera_lookat;
+    break;
   case 'l':
 	  SelectFromMenu(MENU_LIGHTING);
 	  break;

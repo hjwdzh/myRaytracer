@@ -1,13 +1,14 @@
 #include "opengl_util.h"
 #include "objloader.h"
 #include "sampler.h"
-
+#include "glm/glm.hpp"
 #define SAMPLE_SIZE 4
 
 GLuint mesh_texture;
 int num_triangles;
 float* samples;
 extern int g_Width, g_Height;
+extern glm::vec3 camera, camera_up, camera_lookat;
 
 void init_scene() {
 	static bool initialized = false;
@@ -30,10 +31,11 @@ void init_scene() {
 //Set the render world
 void world() {
 	init_scene();
-	float camera[] = {0, 0, -2};
 	float viewplane_dis = 1.0;
 	float viewplane_scale[] = {g_Width / 480.0, g_Height / 480.0};
-	data_to_uniform(camera, 3, 1, "camera");
+	data_to_uniform(&camera[0], 3, 1, "camera");
+	data_to_uniform(&camera_up[0], 3, 1, "camera_up");
+	data_to_uniform(&camera_lookat[0], 3, 1, "camera_lookat");
 	data_to_uniform(&viewplane_dis, 1, 1, "viewplane_dis");
 	data_to_uniform(viewplane_scale, 2, 1, "viewplane_scale");
 	int_to_uniform(num_triangles, "num_triangles");

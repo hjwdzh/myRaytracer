@@ -5,6 +5,9 @@
 uniform vec2 samples[SAMPLE_SIZE];
 
 uniform vec3 camera;
+uniform vec3 camera_up;
+uniform vec3 camera_lookat;
+
 uniform float viewplane_dis;
 uniform vec2 viewplane_scale;
 
@@ -74,13 +77,11 @@ void main() {
 	// Output color = red 
 	vec4 color = vec4(0,0,0,0);
 	vec3 ray_o = camera;
-//	int i = 0;
-	for (int i = 0; i < SAMPLE_SIZE; ++i) {
+	vec3 camera_x = cross(camera_lookat, camera_up);
+	for (int i = 0; i < 1; ++i) {
 		vec2 p = pixel * viewplane_scale + samples[i] / (480.0 * viewplane_scale);
-		vec3 ray_t = normalize(viewplane_dis * vec3(0,0,1)+vec3(p.x,p.y,0));
+		vec3 ray_t = normalize(viewplane_dis * camera_lookat+p.x*camera_x+p.y*camera_up);
 		color = color + hit(ray_o, ray_t);
 	}
-	gl_FragColor = color / SAMPLE_SIZE;
-//	gl_FragColor = vec4(0,0,0,1);
-//	gl_FragColor.r = texture1D(meshSampler,(pixel.x+1)/2).r;
+	gl_FragColor = color / 1;
 }
