@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-c -Wall -g
 LDFLAGS=
-SOURCES=world.cpp shader.cpp main.cpp
+SOURCES=objloader.cpp world.cpp shader.cpp main.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=render
 
