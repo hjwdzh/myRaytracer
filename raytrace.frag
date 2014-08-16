@@ -5,11 +5,11 @@ uniform float viewplane_dis;
 uniform float viewplane_scale;
 
 uniform sampler1D meshSampler;
-uniform float step;
+uniform int num_triangles;
 
 varying vec2 pixel;
 
-int rayIntersectsTriangle(vec3 p, vec3 d,
+float rayIntersectsTriangle(vec3 p, vec3 d,
 			vec3 v0, vec3 v1, vec3 v2) {
 
 	vec3 e1 = v1 - v0;
@@ -38,7 +38,7 @@ int rayIntersectsTriangle(vec3 p, vec3 d,
 	float t = f * dot(e2,q);
 
 	if (t > 0.00001) // ray intersection
-		return 1;
+		return t;
 
 	else // this means that there is a line intersection
 		 // but not a ray intersection
@@ -47,24 +47,29 @@ int rayIntersectsTriangle(vec3 p, vec3 d,
 
 vec4 hit(vec3 ray_o, vec3 ray_t) {
 
-	float i = step/2;
-//	for (float i = 0; i < 1; i += 9 * step) {
+	float depth = 1e30;
+	float object = -1;
+	int j = 0;
+	float step = 1 / (9.0 * num_triangles);
+	float i = step / 2;
+	for (int j = 1; j <= num_triangles; ++j) {
 		vec3 v1 = vec3(texture1D(meshSampler,i).r, texture1D(meshSampler,i+step).r, texture1D(meshSampler,i+2*step).r);
 		vec3 v2 = vec3(texture1D(meshSampler,i+3*step).r, texture1D(meshSampler,i+4*step).r, texture1D(meshSampler,i+5*step).r);
 		vec3 v3 = vec3(texture1D(meshSampler,i+6*step).r, texture1D(meshSampler,i+7*step).r, texture1D(meshSampler,i+8*step).r);
-		if (rayIntersectsTriangle(ray_o, ray_t, v1, v2, v3) == 1) {
-			return vec4(v3.z,0,0,1);
+		float t = rayIntersectsTriangle(ray_o, ray_t, v1, v2, v3);
+		i += step * 9;
+		if (t > 0 && t < depth) {
+			depth = t;
+			object = (j+0.0)/num_triangles;
 		}
-		else {
-			return vec4(1,1,0,1);
-		}
-//	}
+	}
+	return vec4(object,0,0,1);
 }
 
 void main() {
 	// Output color = red 
 	vec3 ray_o = vec3(pixel.x,pixel.y,0);//camera;
-	vec3 ray_t = vec3(0,0,1);//normalize(viewplane_dis * vec3(0,0,1)+viewplane_scale * vec3(pixel.x,pixel.y,0));
+	vec3 ray_t = normalize(viewplane_dis * vec3(0,0,1)+viewplane_scale * vec3(pixel.x,pixel.y,0));
 	gl_FragColor = hit(ray_o, ray_t);
 //	gl_FragColor = vec4(0,0,0,1);
 //	gl_FragColor.r = texture1D(meshSampler,(pixel.x+1)/2).r;
