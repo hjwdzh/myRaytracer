@@ -1,5 +1,6 @@
 #include <iostream>
 #include <GLUT/glut.h>
+#include "shader.h"
 using namespace std;
 
 int g_Width = 600, g_Height = 480;
@@ -12,14 +13,17 @@ enum {
     MENU_EXIT
 };
 
+GLuint programID;
+
 void RenderObjects(void)
 {
     glClear( GL_COLOR_BUFFER_BIT );
+    glUseProgram(programID);
     glBegin(GL_QUADS);
-    glVertex3d(-1,-1,0);
-    glVertex3d(-1,1,0);
-    glVertex3d(1,1,0);
-    glVertex3d(1,-1,0);
+      glVertex3d(-1,-1,0);
+      glVertex3d(-1,1,0);
+      glVertex3d(1,1,0);
+      glVertex3d(1,-1,0);
     glEnd();
 }
 
@@ -147,6 +151,7 @@ int main(int argc, char** argv)
   glutAttachMenu (GLUT_RIGHT_BUTTON);
   // Get the initial time, for use by animation
   // Turn the flow of control over to GLUT
+  programID = LoadShaders( "raytrace.vert", "raytrace.frag" );
   glutMainLoop ();
   return 0;
 }
