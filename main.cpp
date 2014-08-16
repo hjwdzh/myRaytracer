@@ -1,6 +1,7 @@
 #include <iostream>
 #include <GLUT/glut.h>
 #include "shader.h"
+#include "world.h"
 using namespace std;
 
 int g_Width = 600, g_Height = 480;
@@ -17,6 +18,7 @@ GLuint programID;
 
 void RenderObjects(void)
 {
+    world();
     glClear( GL_COLOR_BUFFER_BIT );
     glUseProgram(programID);
     glBegin(GL_QUADS);

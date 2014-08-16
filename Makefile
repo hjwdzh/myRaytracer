@@ -1,14 +1,14 @@
 CC=g++
-CFLAGS=-c -Wall
+CFLAGS=-c -Wall -g
 LDFLAGS=
-SOURCES=shader.cpp main.cpp
+SOURCES=world.cpp shader.cpp main.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=render
 
 all: $(SOURCES) $(EXECUTABLE)
 	
 $(EXECUTABLE): $(OBJECTS) 
-	$(CC) -framework OpenGL -framework GLUT $(LDFLAGS) $(OBJECTS) -o $@
+	$(CC) -g -framework OpenGL -framework GLUT $(LDFLAGS) $(OBJECTS) -o $@
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
