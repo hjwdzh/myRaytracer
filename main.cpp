@@ -8,7 +8,7 @@ using namespace std;
 int g_Width = 600, g_Height = 480;
 float g_nearPlane = 0.1, g_farPlane = 5000;
 
-glm::vec3 camera(0,0,2), camera_up(0,1,0), camera_lookat(0,0,-1);
+glm::vec3 camera(0,0,-5), camera_up(0,1,0), camera_lookat(0,0,1);
 
 struct timeval last_idle_time, time_now;
 enum {

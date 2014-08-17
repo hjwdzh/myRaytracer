@@ -79,6 +79,7 @@ int shadow_ray(vec3 ray_o, vec3 ray_t) {
 		float t = rayIntersectsTriangle(ray_o, ray_t, v1, v2, v3, u, v);
 		if (t > 0)
 			return 1;
+		i += step * 9;
 	}
 	return 0;
 }
@@ -127,10 +128,10 @@ vec3 lighting(vec3 point, vec3 normal, int tri_index, int obj_index) {
 		float intensity = dot(-direct_lights[i], normal);
 		if (intensity < 0)
 			continue;
-//		if (shadow_ray(point, -direct_lights[i]) == 1)
-//			continue;
+		if (shadow_ray(point, -direct_lights[i]) == 1)
+			continue;
 		color += intensity * vec3(1,1,1) * direct_lights_color[i]*kd 
-			+ clamp(pow(dot(reflect(direct_lights[i], normal),eye_dir),10),0,1) * ks * direct_lights_color[i];
+			+ clamp(pow(dot(reflect(direct_lights[i], normal),eye_dir),20),0,1) * ks * direct_lights_color[i];
 	}
 	for (int i = 0; i < num_point_light; ++i) {
 		vec3 dis = point - point_lights[i];
@@ -140,11 +141,11 @@ vec3 lighting(vec3 point, vec3 normal, int tri_index, int obj_index) {
 		float intensity = dot(-dis, normal);
 		if (intensity < 0)
 			continue;
-//		if (shadow_ray(point, -dis) == 1)
-//			continue;
+		if (shadow_ray(point, -dis) == 1)
+			continue;
 		vec3 para = kd * l * point_lights_color[i];
 		color = color + vec3(1,1,1) * clamp(dot(-dis, normal), 0, 1) * para
-			+ clamp(pow(dot(reflect(dis, normal),eye_dir),10),0,1) * ks * point_lights_color[i];
+			+ clamp(pow(dot(reflect(dis, normal),eye_dir),20),0,1) * ks * point_lights_color[i];
 	}
 	return color;
 }

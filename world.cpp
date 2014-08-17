@@ -3,6 +3,7 @@
 #include "sampler.h"
 #include "glm/glm.hpp"
 #include "Geometry.h"
+#include <fstream>
 #define SAMPLE_SIZE 4
 
 GLuint mesh_texture, normal_texture, material_texture;
@@ -26,11 +27,15 @@ void generate_geometries(vector<Geometry*>& geometries) {
 		v_ptr += geometries[i]->vertex.size() * 3;
 		memcpy(n_ptr, geometries[i]->normal.data(), geometries[i]->normal.size() * 3 * sizeof(float));
 		n_ptr += geometries[i]->normal.size() * 3;
-		*m_ptr++ = 0;//geometries[i]->material.x;
-		*m_ptr++ = 0;//geometries[i]->material.y;
+		*m_ptr++ = geometries[i]->material.x;
+		*m_ptr++ = geometries[i]->material.y;
 		*m_ptr++ = geometries[i]->material.z;
 		s += geometries[i]->vertex.size();
 		*m_ptr++ = s;
+	}
+	ofstream os("data");
+	for (int i = 0; i < num_triangles * 9; ++i) {
+		os << vertex_buffer[i] << " " << normal_buffer[i] << "\n";
 	}
 	mesh_texture = create_texture(vertex_buffer, num_triangles * 9);
 	normal_texture = create_texture(normal_buffer, num_triangles * 9);
@@ -43,7 +48,7 @@ void init_scene() {
 		return;
 	vector<Geometry*> geometries;
 	geometries.push_back(new Geometry("cube.obj"));
-//	geometries.push_back(new Geometry("plane.obj"));
+	geometries.push_back(new Geometry("plane.obj"));
 	generate_geometries(geometries);
 	samples = create_sampler(SAMPLE_SIZE);
 	initialized = true;
@@ -54,10 +59,10 @@ void world() {
 	init_scene();
 	float viewplane_dis = 1.0;
 	float viewplane_scale[] = {g_Width / 480.0, g_Height / 480.0};
-	int num_point_light = 0, num_direct_light = 2;
-	float point_light[] = {-10, 10, 10, 10, 10, 10};
+	int num_point_light = 2, num_direct_light = 2;
+	float point_light[] = {-20, 20, -20, 20, 20, -20};
 	float direct_light[] = {0.4 / sqrt(1.32), -1 / sqrt(1.32), -0.4 / sqrt(1.32), -0.4 / sqrt(1.32), -1 / sqrt(1.32), -0.4 / sqrt(1.32)};
-	float point_light_color[] = {90, 0, 0, 90, 0, 0};
+	float point_light_color[] = {300, 0, 0, 300, 0, 0};
 	float direct_light_color[] = {0.0,0.3, 0, 0, 0.3, 0};
 	float ambient[] = {0.0, 0.0, 0.1};
 

@@ -9,8 +9,8 @@ public:
 	Geometry()
 	{}
 
-	Geometry(const char* filename, float kd = 1, float ks = 1, float k3 = 1) {
-		if (!loadOBJ(filename, vertex, uv, normal)) {
+	Geometry(const char* filename, float kd = 1, float ks = 1, float k3 = 1, bool smooth = false) {
+		if (!loadOBJ(filename, vertex, uv, normal, smooth)) {
 			cout << "Load obj fails\n";
 		}
 		material.x = kd;

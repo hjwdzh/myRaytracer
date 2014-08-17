@@ -19,7 +19,8 @@ bool loadOBJ(
 	const char * path, 
 	std::vector<vec3> & out_vertices, 
 	std::vector<vec2> & out_uvs,
-	std::vector<vec3> & out_normals
+	std::vector<vec3> & out_normals,
+	bool smooth
 ){
 	printf("Loading OBJ file %s...\n", path);
 
@@ -86,24 +87,26 @@ bool loadOBJ(
 
 	std::vector<vec3> ave_normals;
 	std::vector<int> num_normals;
-	ave_normals.resize(temp_vertices.size());
-	num_normals.resize(temp_vertices.size());
+	
+	if (smooth) {
+		ave_normals.resize(temp_vertices.size());
+		num_normals.resize(temp_vertices.size());
 
-	for (unsigned int i = 0; i < vertexIndices.size(); ++i) {
-		unsigned int index = vertexIndices[i];
-		unsigned int nindex = normalIndices[i];
-		ave_normals[index - 1].x += temp_normals[nindex - 1].x;
-		ave_normals[index - 1].y += temp_normals[nindex - 1].y;
-		ave_normals[index - 1].z += temp_normals[nindex - 1].z;
-		num_normals[index - 1]++;
+		for (unsigned int i = 0; i < vertexIndices.size(); ++i) {
+			unsigned int index = vertexIndices[i];
+			unsigned int nindex = normalIndices[i];
+			ave_normals[index - 1].x += temp_normals[nindex - 1].x;
+			ave_normals[index - 1].y += temp_normals[nindex - 1].y;
+			ave_normals[index - 1].z += temp_normals[nindex - 1].z;
+			num_normals[index - 1]++;
+		}
+
+		for (unsigned int i = 0; i < temp_vertices.size(); ++i) {
+			ave_normals[i].x /= (float)num_normals[i];
+			ave_normals[i].y /= (float)num_normals[i];
+			ave_normals[i].z /= (float)num_normals[i];
+		}
 	}
-
-	for (unsigned int i = 0; i < temp_vertices.size(); ++i) {
-		ave_normals[i].x /= (float)num_normals[i];
-		ave_normals[i].y /= (float)num_normals[i];
-		ave_normals[i].z /= (float)num_normals[i];
-	}
-
 	// For each vertex of each triangle
 	for( unsigned int i=0; i<vertexIndices.size(); i++ ){
 
@@ -114,13 +117,14 @@ bool loadOBJ(
 		// Get the attributes thanks to the index
 		vec3 vertex = temp_vertices[ vertexIndex-1 ];
 		vec2 uv = temp_uvs[ uvIndex-1 ];
-		vec3 normal = ave_normals[ vertexIndex-1 ];
 		
 		// Put the attributes in buffers
 		out_vertices.push_back(vertex);
 		out_uvs     .push_back(uv);
-		out_normals .push_back(normal);
-	
+		if (smooth)
+			out_normals .push_back(ave_normals[ vertexIndex-1 ]);
+		else
+			out_normals.push_back(temp_normals[normalIndices[i]-1]);
 	}
 
 	return true;
