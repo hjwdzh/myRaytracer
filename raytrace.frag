@@ -17,8 +17,11 @@ uniform vec2 viewplane_scale;
 //Mesh
 uniform sampler1D meshSampler;
 uniform sampler1D normalSampler;
-uniform sampler1D materialSampler;
 uniform int num_triangles;
+
+//object
+/* kd, ks, k3, x1, x2, x3, r1, r2, r3, s1, s2, s3, num
+uniform sampler1D materialSampler;
 uniform int num_object;
 
 //Lights
@@ -68,10 +71,30 @@ float rayIntersectsTriangle(vec3 p, vec3 d,
 		return 0;
 }
 
-int shadow_ray(vec3 ray_o, vec3 ray_t) {
+int shadow_ray(vec3 ray_o_o, vec3 ray_t_o) {
 	float step = 1 / (9.0 * num_triangles);
 	float i = step / 2;
-	for (int j = 0; j < num_triangles; ++j) {
+	int j = 0;
+	for (int k = 0; k < num_object; ++k) {
+	  float next_object = texture1D(materialSampler,(k+12.5/13)/(num_object)).r;
+	  while (j < next_object) {
+		float x1 = texture1D(materialSampler,(k+3.5/13)/(num_object)).r;
+		float x2 = texture1D(materialSampler,(k+4.5/13)/(num_object)).r;
+		float x3 = texture1D(materialSampler,(k+5.5/13)/(num_object)).r;
+		vec3 a = vec3(texture1D(materialSampler,(k+6.5/13)/(num_object)).r,
+		  				texture1D(materialSampler,(k+7.5/13)/(num_object)).r,
+		  				texture1D(materialSampler,(k+8.5/13)/(num_object)).r);
+		vec3 b = vec3(texture1D(materialSampler,(k+9.5/13)/(num_object)).r,
+						texture1D(materialSampler,(k+10.5/13)/(num_object)).r,
+		  				texture1D(materialSampler,(k+11.5/13)/(num_object)).r);
+		vec3 c = cross(b,a);
+
+		mat4 translate = mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0),
+			vec4(x1,x2,x3,1));
+		mat4 convert = inverse(translate * mat4(vec4(a,0),vec4(b,0),vec4(c,0),vec4(0,0,0,1)));
+		vec3 ray_o = (convert * vec4(ray_o_o,1)).xyz;
+		vec3 ray_t = (convert * vec4(ray_t_o,0)).xyz;
+
 		vec3 v1 = vec3(texture1D(meshSampler,i).r, texture1D(meshSampler,i+step).r, texture1D(meshSampler,i+2*step).r);
 		vec3 v2 = vec3(texture1D(meshSampler,i+3*step).r, texture1D(meshSampler,i+4*step).r, texture1D(meshSampler,i+5*step).r);
 		vec3 v3 = vec3(texture1D(meshSampler,i+6*step).r, texture1D(meshSampler,i+7*step).r, texture1D(meshSampler,i+8*step).r);
@@ -80,11 +103,13 @@ int shadow_ray(vec3 ray_o, vec3 ray_t) {
 		if (t > 0)
 			return 1;
 		i += step * 9;
+		j += 1;
+	  }
 	}
 	return 0;
 }
 
-float tracing(vec3 ray_o, vec3 ray_t, inout int tri, inout int obj, inout vec3 normal) {
+float tracing(vec3 ray_o_o, vec3 ray_t_o, inout int tri, inout int obj, inout vec3 normal) {
 	float depth = 1e30;
 	int j = 0;
 	float step = 1 / (9.0 * num_triangles);
@@ -93,7 +118,24 @@ float tracing(vec3 ray_o, vec3 ray_t, inout int tri, inout int obj, inout vec3 n
 	tri = -1;
 	vec3 normals;
 	for (int k = 0; k < num_object; ++k) {
-	  float next_object = texture1D(materialSampler,(k+3.5/4)/(num_object)).r;
+	  float x1 = texture1D(materialSampler,(k+3.5/13)/(num_object)).r;
+	  float x2 = texture1D(materialSampler,(k+4.5/13)/(num_object)).r;
+	  float x3 = texture1D(materialSampler,(k+5.5/13)/(num_object)).r;
+	  vec3 a = vec3(texture1D(materialSampler,(k+6.5/13)/(num_object)).r,
+	  				texture1D(materialSampler,(k+7.5/13)/(num_object)).r,
+	  				texture1D(materialSampler,(k+8.5/13)/(num_object)).r);
+	  vec3 b = vec3(texture1D(materialSampler,(k+9.5/13)/(num_object)).r,
+	  				texture1D(materialSampler,(k+10.5/13)/(num_object)).r,
+	  				texture1D(materialSampler,(k+11.5/13)/(num_object)).r);
+	  vec3 c = cross(b,a);
+
+	  mat4 translate = mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0),
+	  	vec4(x1,x2,x3,1));
+	  mat4 convert = inverse(translate * mat4(vec4(a,0),vec4(b,0),vec4(c,0),vec4(0,0,0,1)));
+	  vec3 ray_o = (convert * vec4(ray_o_o,1)).xyz;
+	  vec3 ray_t = (convert * vec4(ray_t_o,0)).xyz;
+
+	  float next_object = texture1D(materialSampler,(k+12.5/13)/(num_object)).r;
 	  while (j < next_object) {
 		vec3 v1 = vec3(texture1D(meshSampler,i).r, texture1D(meshSampler,i+step).r, texture1D(meshSampler,i+2*step).r);
 		vec3 v2 = vec3(texture1D(meshSampler,i+3*step).r, texture1D(meshSampler,i+4*step).r, texture1D(meshSampler,i+5*step).r);
@@ -117,9 +159,9 @@ float tracing(vec3 ray_o, vec3 ray_t, inout int tri, inout int obj, inout vec3 n
 }
 
 vec3 lighting(vec3 point, vec3 normal, int tri_index, int obj_index) {
-	float kd = texture1D(materialSampler, (obj_index+0.5/4)/num_object).r;
-	float ks = texture1D(materialSampler, (obj_index+1.5/4)/num_object).r;
-	float k3 = texture1D(materialSampler, (obj_index+2.5/4)/num_object).r;
+	float kd = texture1D(materialSampler, (obj_index+0.5/13)/num_object).r;
+	float ks = texture1D(materialSampler, (obj_index+1.5/13)/num_object).r;
+	float k3 = texture1D(materialSampler, (obj_index+2.5/13)/num_object).r;
 	vec3 color = vec3(1,1,1) * ambient;
 	vec3 eye_dir = normalize(camera - point);
 	if (dot(eye_dir,normal) < 0)

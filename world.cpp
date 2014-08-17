@@ -19,17 +19,23 @@ void generate_geometries(vector<Geometry*>& geometries) {
 		num_triangles += geometries[i]->vertex.size() / 3;
 	float* vertex_buffer = new float[num_triangles * 9];
 	float* normal_buffer = new float[num_triangles * 9];
-	float* material = new float[4 * num_object];
-	float* v_ptr = vertex_buffer, *n_ptr = normal_buffer, *m_ptr = material;
+	float* material = new float[13 * num_object];
+	float *v_ptr = vertex_buffer, *n_ptr = normal_buffer, 
+		  *m_ptr = material;
 	int s = 0;
 	for (int i = 0; i < num_object; ++i) {
 		memcpy(v_ptr, geometries[i]->vertex.data(), geometries[i]->vertex.size() * 3 * sizeof(float));
 		v_ptr += geometries[i]->vertex.size() * 3;
 		memcpy(n_ptr, geometries[i]->normal.data(), geometries[i]->normal.size() * 3 * sizeof(float));
 		n_ptr += geometries[i]->normal.size() * 3;
-		*m_ptr++ = geometries[i]->material.x;
-		*m_ptr++ = geometries[i]->material.y;
-		*m_ptr++ = geometries[i]->material.z;
+		memcpy(m_ptr, &(geometries[i]->material), sizeof(float) * 3);
+		m_ptr += 3;
+		memcpy(m_ptr, &(geometries[i]->offset), sizeof(float) * 3);
+		m_ptr += 3;
+		memcpy(m_ptr, &(geometries[i]->x_axis), sizeof(float) * 3);
+		m_ptr += 3;
+		memcpy(m_ptr, &(geometries[i]->y_axis), sizeof(float) * 3);
+		m_ptr += 3;
 		s += geometries[i]->vertex.size();
 		*m_ptr++ = s;
 	}
@@ -40,6 +46,9 @@ void generate_geometries(vector<Geometry*>& geometries) {
 	mesh_texture = create_texture(vertex_buffer, num_triangles * 9);
 	normal_texture = create_texture(normal_buffer, num_triangles * 9);
 	material_texture = create_texture(material, 4 * num_object);
+	delete[] vertex_buffer;
+	delete[] normal_buffer;
+	delete[] material;
 }
 
 void init_scene() {
