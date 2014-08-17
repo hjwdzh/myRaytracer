@@ -8,7 +8,7 @@ using namespace std;
 int g_Width = 600, g_Height = 480;
 float g_nearPlane = 0.1, g_farPlane = 5000;
 
-glm::vec3 camera(0,0,-2), camera_up(0,1,0), camera_lookat(0,0,1);
+glm::vec3 camera(0,0,2), camera_up(0,1,0), camera_lookat(0,0,-1);
 
 struct timeval last_idle_time, time_now;
 enum {
@@ -109,7 +109,7 @@ void SelectFromMenu(int idCommand)
 
 void Keyboard(unsigned char key, int x, int y)
 {
-  glm::vec3 camera_x = glm::cross(camera_lookat, camera_up);;
+  glm::vec3 camera_x = glm::cross(camera_lookat, camera_up);
   switch (key)
   {
   case 27:             // ESCAPE key
@@ -123,10 +123,10 @@ void Keyboard(unsigned char key, int x, int y)
     camera_up = glm::normalize(camera_up + (float)(tan(5 / 180.0 * 3.1415926)) * camera_lookat);
     camera_lookat = glm::cross(camera_up, camera_x);
     break;
-  case 'a':
+  case 'd':
     camera_lookat = glm::normalize(camera_lookat + (float)(tan(5 / 180.0 * 3.1415926)) * camera_x);
     break;
-  case 'd':
+  case 'a':
     camera_lookat = glm::normalize(camera_lookat - (float)(tan(5 / 180.0 * 3.1415926)) * camera_x);
     break;
   case 'f':
@@ -134,6 +134,18 @@ void Keyboard(unsigned char key, int x, int y)
     break;
   case 'b':
     camera = camera - 0.1f * camera_lookat;
+    break;
+  case 'u':
+    camera = camera + 0.1f * camera_up;
+    break;
+  case 'n':
+    camera = camera - 0.1f * camera_up;
+    break;
+  case 'i':
+    camera = camera + 0.1f * camera_x;
+    break;
+  case 'k':
+    camera = camera - 0.1f * camera_x;
     break;
   case 'l':
 	  SelectFromMenu(MENU_LIGHTING);
