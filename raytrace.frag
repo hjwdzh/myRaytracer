@@ -105,18 +105,27 @@ vec3 tracing(vec3 point, vec3 normal, int tri_index, int obj_index) {
 	float ks = texture1D(materialSampler, (obj_index+1.5/4)/num_object).r;
 	float k3 = texture1D(materialSampler, (obj_index+2.5/4)/num_object).r;
 	vec3 color = vec3(1,1,1) * ambient;
+	vec3 eye_dir = normalize(camera - point);
+	if (dot(eye_dir,normal) < 0)
+		normal = -normal;
 	for (int i = 0; i < num_direct_light; ++i) {
 		float intensity = dot(-direct_lights[i], normal);
-		color = color + intensity * vec3(1,1,1) * direct_lights_color[i]*ks;
+		if (intensity < 0)
+			continue;
+		color += intensity * vec3(1,1,1) * direct_lights_color[i]*kd 
+			+ clamp(pow(dot(reflect(direct_lights[i], normal),eye_dir),10),0,1) * ks * direct_lights_color[i];
 	}
 	for (int i = 0; i < num_point_light; ++i) {
-		vec3 dis = point_lights[i] - point;
+		vec3 dis = point - point_lights[i];
 		float l = 1 / (length(dis));
 		l = l * l;
-		vec3 para = ks * l * point_lights_color[i];
-		color = color + vec3(1,1,1) * clamp(
-			dot(normalize(dis), normal), 0, 1)
-			* para;
+		dis = normalize(dis);
+		float intensity = dot(-dis, normal);
+		if (intensity < 0)
+			continue;
+		vec3 para = kd * l * point_lights_color[i];
+		color = color + vec3(1,1,1) * clamp(dot(-dis, normal), 0, 1) * para
+			+ clamp(pow(dot(reflect(dis, normal),eye_dir),10),0,1) * ks * point_lights_color[i];
 	}
 	return color;
 }
