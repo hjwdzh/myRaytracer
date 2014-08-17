@@ -4,8 +4,8 @@
 #include "glm/glm.hpp"
 #define SAMPLE_SIZE 4
 
-GLuint mesh_texture, normal_texture;
-int num_triangles;
+GLuint mesh_texture, normal_texture, material_texture;
+int num_triangles, num_object;
 float* samples;
 extern int g_Width, g_Height;
 extern glm::vec3 camera, camera_up, camera_lookat;
@@ -20,9 +20,11 @@ void init_scene() {
 		cout << "Load obj fails\n";
 	}
 	num_triangles = vertex.size() / 3;
+	num_object = 1;
 	mesh_texture = create_texture((float*)vertex.data(), num_triangles * 9);
 	normal_texture = create_texture((float*)normal.data(), num_triangles * 9);
-	float* s = (float*)normal.data();
+	float material[] = {1, 1, 1, num_triangles - 0.5};
+	material_texture = create_texture(material, 4 * num_object);
 	samples = create_sampler(SAMPLE_SIZE);
 	initialized = true;
 }
@@ -59,4 +61,8 @@ void world() {
 	glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_1D, normal_texture);
 	int_to_uniform(1, "normalSampler");
+	glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_1D, material_texture);
+	int_to_uniform(2, "materialSampler");
+	int_to_uniform(num_object, "num_object");
 }

@@ -1,6 +1,7 @@
 #version 120
 
 #define SAMPLE_SIZE 16
+#define LIGHT_SIZE 64
 //Samplers
 uniform vec2 samples[SAMPLE_SIZE];
 
@@ -16,13 +17,15 @@ uniform vec2 viewplane_scale;
 //Mesh
 uniform sampler1D meshSampler;
 uniform sampler1D normalSampler;
+uniform sampler1D materialSampler;
 uniform int num_triangles;
+uniform int num_object;
 
 //Lights
-uniform vec3 point_lights[64];
-uniform vec3 point_lights_color[64];
-uniform vec3 direct_lights[64];
-uniform vec3 direct_lights_color[64];
+uniform vec3 point_lights[LIGHT_SIZE];
+uniform vec3 point_lights_color[LIGHT_SIZE];
+uniform vec3 direct_lights[LIGHT_SIZE];
+uniform vec3 direct_lights_color[LIGHT_SIZE];
 uniform int num_point_light, num_direct_light;
 uniform vec3 ambient;
 
@@ -65,15 +68,17 @@ float rayIntersectsTriangle(vec3 p, vec3 d,
 		return 0;
 }
 
-float hit(vec3 ray_o, vec3 ray_t, inout int obj, inout vec3 normal) {
-
+float hit(vec3 ray_o, vec3 ray_t, inout int tri, inout int obj, inout vec3 normal) {
 	float depth = 1e30;
 	int j = 0;
 	float step = 1 / (9.0 * num_triangles);
 	float i = step / 2;
 	obj = -1;
+	tri = -1;
 	vec3 normals;
-	for (int j = 1; j <= num_triangles; ++j) {
+	for (int k = 0; k < num_object; ++k) {
+	  float next_object = texture1D(materialSampler,(k+3.5/4)/(num_object)).r;
+	  while (j < next_object) {
 		vec3 v1 = vec3(texture1D(meshSampler,i).r, texture1D(meshSampler,i+step).r, texture1D(meshSampler,i+2*step).r);
 		vec3 v2 = vec3(texture1D(meshSampler,i+3*step).r, texture1D(meshSampler,i+4*step).r, texture1D(meshSampler,i+5*step).r);
 		vec3 v3 = vec3(texture1D(meshSampler,i+6*step).r, texture1D(meshSampler,i+7*step).r, texture1D(meshSampler,i+8*step).r);
@@ -81,28 +86,34 @@ float hit(vec3 ray_o, vec3 ray_t, inout int obj, inout vec3 normal) {
 		float t = rayIntersectsTriangle(ray_o, ray_t, v1, v2, v3, u, v);
 		if (t > 0 && t < depth) {
 			depth = t;
-			obj = j;
+			obj = k;
+			tri = j;
 			vec3 n1 = vec3(texture1D(normalSampler,i).r, texture1D(normalSampler,i+step).r, texture1D(normalSampler,i+2*step).r);
 			vec3 n2 = vec3(texture1D(normalSampler,i+3*step).r, texture1D(normalSampler,i+4*step).r, texture1D(normalSampler,i+5*step).r);
 			vec3 n3 = vec3(texture1D(normalSampler,i+6*step).r, texture1D(normalSampler,i+7*step).r, texture1D(normalSampler,i+8*step).r);
 			normal = u * (n2 - n1) + v * (n3 - n1) + n1;
 		}
 		i += step * 9;
+		j += 1;
+	  }
 	}
 	return depth;
 }
 
-vec3 tracing(vec3 point, vec3 normal, int index) {
+vec3 tracing(vec3 point, vec3 normal, int tri_index, int obj_index) {
+	float kd = texture1D(materialSampler, (obj_index+0.5/4)/num_object).r;
+	float ks = texture1D(materialSampler, (obj_index+1.5/4)/num_object).r;
+	float k3 = texture1D(materialSampler, (obj_index+2.5/4)/num_object).r;
 	vec3 color = vec3(1,1,1) * ambient;
 	for (int i = 0; i < num_direct_light; ++i) {
 		float intensity = dot(-direct_lights[i], normal);
-		color = color + intensity * vec3(1,1,1) * direct_lights_color[i];
+		color = color + intensity * vec3(1,1,1) * direct_lights_color[i]*ks;
 	}
 	for (int i = 0; i < num_point_light; ++i) {
 		vec3 dis = point_lights[i] - point;
 		float l = 1 / (length(dis));
 		l = l * l;
-		vec3 para = l * point_lights_color[i];
+		vec3 para = ks * l * point_lights_color[i];
 		color = color + vec3(1,1,1) * clamp(
 			dot(normalize(dis), normal), 0, 1)
 			* para;
@@ -117,13 +128,13 @@ void main() {
 	vec3 camera_x = cross(camera_lookat, camera_up);
 	vec3 normal = vec3(0,0,0);
 	for (int i = 0; i < SAMPLE_SIZE; ++i) {
-		int index;
+		int tri_index, obj_index;
 		vec2 p = pixel * viewplane_scale + samples[i] / (480.0 * viewplane_scale);
 		vec3 ray_t = normalize(viewplane_dis * camera_lookat+p.x*camera_x+p.y*camera_up);
-		float depth = hit(ray_o, ray_t, index, normal);
+		float depth = hit(ray_o, ray_t, tri_index, obj_index, normal);
 		if (depth < 1e20) {
 			vec3 hit_point = ray_o + depth * ray_t;
-			color += tracing(hit_point, normal, index);
+			color += tracing(hit_point, normal, tri_index, obj_index);
 		}
 	}
 	gl_FragColor.rgb = color / SAMPLE_SIZE;
