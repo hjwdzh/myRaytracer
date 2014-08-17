@@ -68,7 +68,22 @@ float rayIntersectsTriangle(vec3 p, vec3 d,
 		return 0;
 }
 
-float hit(vec3 ray_o, vec3 ray_t, inout int tri, inout int obj, inout vec3 normal) {
+int shadow_ray(vec3 ray_o, vec3 ray_t) {
+	float step = 1 / (9.0 * num_triangles);
+	float i = step / 2;
+	for (int j = 0; j < num_triangles; ++j) {
+		vec3 v1 = vec3(texture1D(meshSampler,i).r, texture1D(meshSampler,i+step).r, texture1D(meshSampler,i+2*step).r);
+		vec3 v2 = vec3(texture1D(meshSampler,i+3*step).r, texture1D(meshSampler,i+4*step).r, texture1D(meshSampler,i+5*step).r);
+		vec3 v3 = vec3(texture1D(meshSampler,i+6*step).r, texture1D(meshSampler,i+7*step).r, texture1D(meshSampler,i+8*step).r);
+		float u, v;
+		float t = rayIntersectsTriangle(ray_o, ray_t, v1, v2, v3, u, v);
+		if (t > 0)
+			return 1;
+	}
+	return 0;
+}
+
+float tracing(vec3 ray_o, vec3 ray_t, inout int tri, inout int obj, inout vec3 normal) {
 	float depth = 1e30;
 	int j = 0;
 	float step = 1 / (9.0 * num_triangles);
@@ -100,7 +115,7 @@ float hit(vec3 ray_o, vec3 ray_t, inout int tri, inout int obj, inout vec3 norma
 	return depth;
 }
 
-vec3 tracing(vec3 point, vec3 normal, int tri_index, int obj_index) {
+vec3 lighting(vec3 point, vec3 normal, int tri_index, int obj_index) {
 	float kd = texture1D(materialSampler, (obj_index+0.5/4)/num_object).r;
 	float ks = texture1D(materialSampler, (obj_index+1.5/4)/num_object).r;
 	float k3 = texture1D(materialSampler, (obj_index+2.5/4)/num_object).r;
@@ -112,6 +127,8 @@ vec3 tracing(vec3 point, vec3 normal, int tri_index, int obj_index) {
 		float intensity = dot(-direct_lights[i], normal);
 		if (intensity < 0)
 			continue;
+//		if (shadow_ray(point, -direct_lights[i]) == 1)
+//			continue;
 		color += intensity * vec3(1,1,1) * direct_lights_color[i]*kd 
 			+ clamp(pow(dot(reflect(direct_lights[i], normal),eye_dir),10),0,1) * ks * direct_lights_color[i];
 	}
@@ -123,6 +140,8 @@ vec3 tracing(vec3 point, vec3 normal, int tri_index, int obj_index) {
 		float intensity = dot(-dis, normal);
 		if (intensity < 0)
 			continue;
+//		if (shadow_ray(point, -dis) == 1)
+//			continue;
 		vec3 para = kd * l * point_lights_color[i];
 		color = color + vec3(1,1,1) * clamp(dot(-dis, normal), 0, 1) * para
 			+ clamp(pow(dot(reflect(dis, normal),eye_dir),10),0,1) * ks * point_lights_color[i];
@@ -140,10 +159,10 @@ void main() {
 		int tri_index, obj_index;
 		vec2 p = pixel * viewplane_scale + samples[i] / (480.0 * viewplane_scale);
 		vec3 ray_t = normalize(viewplane_dis * camera_lookat+p.x*camera_x+p.y*camera_up);
-		float depth = hit(ray_o, ray_t, tri_index, obj_index, normal);
+		float depth = tracing(ray_o, ray_t, tri_index, obj_index, normal);
 		if (depth < 1e20) {
 			vec3 hit_point = ray_o + depth * ray_t;
-			color += tracing(hit_point, normal, tri_index, obj_index);
+			color += lighting(hit_point, normal, tri_index, obj_index);
 		}
 	}
 	gl_FragColor.rgb = color / SAMPLE_SIZE;

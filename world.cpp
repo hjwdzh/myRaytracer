@@ -2,6 +2,7 @@
 #include "objloader.h"
 #include "sampler.h"
 #include "glm/glm.hpp"
+#include "Geometry.h"
 #define SAMPLE_SIZE 4
 
 GLuint mesh_texture, normal_texture, material_texture;
@@ -10,21 +11,40 @@ float* samples;
 extern int g_Width, g_Height;
 extern glm::vec3 camera, camera_up, camera_lookat;
 
+void generate_geometries(vector<Geometry*>& geometries) {
+	num_triangles = 0;
+	num_object = geometries.size();
+	for (int i = 0; i < num_object; ++i)
+		num_triangles += geometries[i]->vertex.size() / 3;
+	float* vertex_buffer = new float[num_triangles * 9];
+	float* normal_buffer = new float[num_triangles * 9];
+	float* material = new float[4 * num_object];
+	float* v_ptr = vertex_buffer, *n_ptr = normal_buffer, *m_ptr = material;
+	int s = 0;
+	for (int i = 0; i < num_object; ++i) {
+		memcpy(v_ptr, geometries[i]->vertex.data(), geometries[i]->vertex.size() * 3 * sizeof(float));
+		v_ptr += geometries[i]->vertex.size() * 3;
+		memcpy(n_ptr, geometries[i]->normal.data(), geometries[i]->normal.size() * 3 * sizeof(float));
+		n_ptr += geometries[i]->normal.size() * 3;
+		*m_ptr++ = 0;//geometries[i]->material.x;
+		*m_ptr++ = 0;//geometries[i]->material.y;
+		*m_ptr++ = geometries[i]->material.z;
+		s += geometries[i]->vertex.size();
+		*m_ptr++ = s;
+	}
+	mesh_texture = create_texture(vertex_buffer, num_triangles * 9);
+	normal_texture = create_texture(normal_buffer, num_triangles * 9);
+	material_texture = create_texture(material, 4 * num_object);
+}
+
 void init_scene() {
 	static bool initialized = false;
 	if (initialized)
 		return;
-	vector<vec3> vertex, normal;
-	vector<vec2> uv;
-	if (!loadOBJ("suzanne.obj", vertex, uv, normal)) {
-		cout << "Load obj fails\n";
-	}
-	num_triangles = vertex.size() / 3;
-	num_object = 1;
-	mesh_texture = create_texture((float*)vertex.data(), num_triangles * 9);
-	normal_texture = create_texture((float*)normal.data(), num_triangles * 9);
-	float material[] = {1, 1, 1, num_triangles - 0.5};
-	material_texture = create_texture(material, 4 * num_object);
+	vector<Geometry*> geometries;
+	geometries.push_back(new Geometry("cube.obj"));
+//	geometries.push_back(new Geometry("plane.obj"));
+	generate_geometries(geometries);
 	samples = create_sampler(SAMPLE_SIZE);
 	initialized = true;
 }
@@ -34,7 +54,7 @@ void world() {
 	init_scene();
 	float viewplane_dis = 1.0;
 	float viewplane_scale[] = {g_Width / 480.0, g_Height / 480.0};
-	int num_point_light = 2, num_direct_light = 2;
+	int num_point_light = 0, num_direct_light = 2;
 	float point_light[] = {-10, 10, 10, 10, 10, 10};
 	float direct_light[] = {0.4 / sqrt(1.32), -1 / sqrt(1.32), -0.4 / sqrt(1.32), -0.4 / sqrt(1.32), -1 / sqrt(1.32), -0.4 / sqrt(1.32)};
 	float point_light_color[] = {90, 0, 0, 90, 0, 0};
