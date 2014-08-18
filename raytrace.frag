@@ -17,11 +17,8 @@ uniform vec2 viewplane_scale;
 //Mesh
 uniform sampler1D meshSampler;
 uniform sampler1D normalSampler;
-uniform int num_triangles;
-
-//object
-/* kd, ks, k3, x1, x2, x3, r1, r2, r3, s1, s2, s3, num
 uniform sampler1D materialSampler;
+uniform int num_triangles;
 uniform int num_object;
 
 //Lights
@@ -71,41 +68,40 @@ float rayIntersectsTriangle(vec3 p, vec3 d,
 		return 0;
 }
 
-int shadow_ray(vec3 ray_o_o, vec3 ray_t_o) {
+int shadow_ray(vec3 ray_o_o, vec3 ray_t_o, float depth) {
 	float step = 1 / (9.0 * num_triangles);
 	float i = step / 2;
 	int j = 0;
 	for (int k = 0; k < num_object; ++k) {
 	  float next_object = texture1D(materialSampler,(k+12.5/13)/(num_object)).r;
+	  float x1 = texture1D(materialSampler,(k+3.5/13)/(num_object)).r;
+	  float x2 = texture1D(materialSampler,(k+4.5/13)/(num_object)).r;
+	  float x3 = texture1D(materialSampler,(k+5.5/13)/(num_object)).r;
+	  vec3 a = vec3(texture1D(materialSampler,(k+6.5/13)/(num_object)).r,
+	  				texture1D(materialSampler,(k+7.5/13)/(num_object)).r,
+	  				texture1D(materialSampler,(k+8.5/13)/(num_object)).r);
+	  vec3 b = vec3(texture1D(materialSampler,(k+9.5/13)/(num_object)).r,
+	  				texture1D(materialSampler,(k+10.5/13)/(num_object)).r,
+	  				texture1D(materialSampler,(k+11.5/13)/(num_object)).r);
+	  vec3 c = cross(b,a);
+
+	  mat3 convert = transpose(mat3(a,b,c));
+	  vec3 ray_o = convert * (ray_o_o - vec3(x1,x2,x3));
+	  vec3 ray_t = convert * ray_t_o;
+
 	  while (j < next_object) {
-		float x1 = texture1D(materialSampler,(k+3.5/13)/(num_object)).r;
-		float x2 = texture1D(materialSampler,(k+4.5/13)/(num_object)).r;
-		float x3 = texture1D(materialSampler,(k+5.5/13)/(num_object)).r;
-		vec3 a = vec3(texture1D(materialSampler,(k+6.5/13)/(num_object)).r,
-		  				texture1D(materialSampler,(k+7.5/13)/(num_object)).r,
-		  				texture1D(materialSampler,(k+8.5/13)/(num_object)).r);
-		vec3 b = vec3(texture1D(materialSampler,(k+9.5/13)/(num_object)).r,
-						texture1D(materialSampler,(k+10.5/13)/(num_object)).r,
-		  				texture1D(materialSampler,(k+11.5/13)/(num_object)).r);
-		vec3 c = cross(b,a);
-
-		mat4 translate = mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0),
-			vec4(x1,x2,x3,1));
-		mat4 convert = inverse(translate * mat4(vec4(a,0),vec4(b,0),vec4(c,0),vec4(0,0,0,1)));
-		vec3 ray_o = (convert * vec4(ray_o_o,1)).xyz;
-		vec3 ray_t = (convert * vec4(ray_t_o,0)).xyz;
-
 		vec3 v1 = vec3(texture1D(meshSampler,i).r, texture1D(meshSampler,i+step).r, texture1D(meshSampler,i+2*step).r);
 		vec3 v2 = vec3(texture1D(meshSampler,i+3*step).r, texture1D(meshSampler,i+4*step).r, texture1D(meshSampler,i+5*step).r);
 		vec3 v3 = vec3(texture1D(meshSampler,i+6*step).r, texture1D(meshSampler,i+7*step).r, texture1D(meshSampler,i+8*step).r);
 		float u, v;
 		float t = rayIntersectsTriangle(ray_o, ray_t, v1, v2, v3, u, v);
-		if (t > 0)
+		if (t > 0 && t < depth) {
 			return 1;
+		}
 		i += step * 9;
 		j += 1;
 	  }
-	}
+	}	
 	return 0;
 }
 
@@ -118,6 +114,7 @@ float tracing(vec3 ray_o_o, vec3 ray_t_o, inout int tri, inout int obj, inout ve
 	tri = -1;
 	vec3 normals;
 	for (int k = 0; k < num_object; ++k) {
+	  float next_object = texture1D(materialSampler,(k+12.5/13)/(num_object)).r;
 	  float x1 = texture1D(materialSampler,(k+3.5/13)/(num_object)).r;
 	  float x2 = texture1D(materialSampler,(k+4.5/13)/(num_object)).r;
 	  float x3 = texture1D(materialSampler,(k+5.5/13)/(num_object)).r;
@@ -129,13 +126,11 @@ float tracing(vec3 ray_o_o, vec3 ray_t_o, inout int tri, inout int obj, inout ve
 	  				texture1D(materialSampler,(k+11.5/13)/(num_object)).r);
 	  vec3 c = cross(b,a);
 
-	  mat4 translate = mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0),
-	  	vec4(x1,x2,x3,1));
-	  mat4 convert = inverse(translate * mat4(vec4(a,0),vec4(b,0),vec4(c,0),vec4(0,0,0,1)));
-	  vec3 ray_o = (convert * vec4(ray_o_o,1)).xyz;
-	  vec3 ray_t = (convert * vec4(ray_t_o,0)).xyz;
+	  mat3 convert = mat3(a,b,c);
+	  mat3 inv_convert = transpose(convert);
+	  vec3 ray_o = inv_convert * (ray_o_o - vec3(x1,x2,x3));
+	  vec3 ray_t = inv_convert * ray_t_o;
 
-	  float next_object = texture1D(materialSampler,(k+12.5/13)/(num_object)).r;
 	  while (j < next_object) {
 		vec3 v1 = vec3(texture1D(meshSampler,i).r, texture1D(meshSampler,i+step).r, texture1D(meshSampler,i+2*step).r);
 		vec3 v2 = vec3(texture1D(meshSampler,i+3*step).r, texture1D(meshSampler,i+4*step).r, texture1D(meshSampler,i+5*step).r);
@@ -149,7 +144,7 @@ float tracing(vec3 ray_o_o, vec3 ray_t_o, inout int tri, inout int obj, inout ve
 			vec3 n1 = vec3(texture1D(normalSampler,i).r, texture1D(normalSampler,i+step).r, texture1D(normalSampler,i+2*step).r);
 			vec3 n2 = vec3(texture1D(normalSampler,i+3*step).r, texture1D(normalSampler,i+4*step).r, texture1D(normalSampler,i+5*step).r);
 			vec3 n3 = vec3(texture1D(normalSampler,i+6*step).r, texture1D(normalSampler,i+7*step).r, texture1D(normalSampler,i+8*step).r);
-			normal = u * (n2 - n1) + v * (n3 - n1) + n1;
+			normal = normalize(convert * (u * (n2 - n1) + v * (n3 - n1) + n1));
 		}
 		i += step * 9;
 		j += 1;
@@ -170,20 +165,21 @@ vec3 lighting(vec3 point, vec3 normal, int tri_index, int obj_index) {
 		float intensity = dot(-direct_lights[i], normal);
 		if (intensity < 0)
 			continue;
-		if (shadow_ray(point, -direct_lights[i]) == 1)
+		if (shadow_ray(point, -direct_lights[i], 1e30) == 1)
 			continue;
 		color += intensity * vec3(1,1,1) * direct_lights_color[i]*kd 
 			+ clamp(pow(dot(reflect(direct_lights[i], normal),eye_dir),20),0,1) * ks * direct_lights_color[i];
 	}
 	for (int i = 0; i < num_point_light; ++i) {
 		vec3 dis = point - point_lights[i];
-		float l = 1 / (length(dis));
+		float len = length(dis);
+		float l = 1 / len;
 		l = l * l;
 		dis = normalize(dis);
 		float intensity = dot(-dis, normal);
 		if (intensity < 0)
 			continue;
-		if (shadow_ray(point, -dis) == 1)
+		if (shadow_ray(point, -dis, len) == 1)
 			continue;
 		vec3 para = kd * l * point_lights_color[i];
 		color = color + vec3(1,1,1) * clamp(dot(-dis, normal), 0, 1) * para

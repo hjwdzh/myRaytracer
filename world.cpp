@@ -3,6 +3,7 @@
 #include "sampler.h"
 #include "glm/glm.hpp"
 #include "Geometry.h"
+#include "BVH.h"
 #include <fstream>
 #define SAMPLE_SIZE 4
 
@@ -20,10 +21,14 @@ void generate_geometries(vector<Geometry*>& geometries) {
 	float* vertex_buffer = new float[num_triangles * 9];
 	float* normal_buffer = new float[num_triangles * 9];
 	float* material = new float[13 * num_object];
+	int* mat_index = new int[num_triangles];
 	float *v_ptr = vertex_buffer, *n_ptr = normal_buffer, 
 		  *m_ptr = material;
 	int s = 0;
 	for (int i = 0; i < num_object; ++i) {
+		int num_tri = geometries[i]->vertex.size() / 3;
+		for (int j = 0; j < num_tri; ++j)
+			mat_index[s + j] = i;
 		memcpy(v_ptr, geometries[i]->vertex.data(), geometries[i]->vertex.size() * 3 * sizeof(float));
 		v_ptr += geometries[i]->vertex.size() * 3;
 		memcpy(n_ptr, geometries[i]->normal.data(), geometries[i]->normal.size() * 3 * sizeof(float));
@@ -36,16 +41,13 @@ void generate_geometries(vector<Geometry*>& geometries) {
 		m_ptr += 3;
 		memcpy(m_ptr, &(geometries[i]->y_axis), sizeof(float) * 3);
 		m_ptr += 3;
-		s += geometries[i]->vertex.size();
+		s += geometries[i]->vertex.size() / 3;
 		*m_ptr++ = s;
 	}
-	ofstream os("data");
-	for (int i = 0; i < num_triangles * 9; ++i) {
-		os << vertex_buffer[i] << " " << normal_buffer[i] << "\n";
-	}
+	BVH bvh(vertex_buffer, normal_buffer, mat_index, num_triangles);
 	mesh_texture = create_texture(vertex_buffer, num_triangles * 9);
 	normal_texture = create_texture(normal_buffer, num_triangles * 9);
-	material_texture = create_texture(material, 4 * num_object);
+	material_texture = create_texture(material, 13 * num_object);
 	delete[] vertex_buffer;
 	delete[] normal_buffer;
 	delete[] material;
@@ -56,7 +58,10 @@ void init_scene() {
 	if (initialized)
 		return;
 	vector<Geometry*> geometries;
-	geometries.push_back(new Geometry("cube.obj"));
+	Geometry* g = new Geometry("cube.obj");
+//	g->Translate(glm::vec3(1,1,1));
+//	g->Rotate(90, glm::vec3(1/sqrt(3),1/sqrt(3),1/sqrt(3)));
+	geometries.push_back(g);
 	geometries.push_back(new Geometry("plane.obj"));
 	generate_geometries(geometries);
 	samples = create_sampler(SAMPLE_SIZE);
@@ -69,7 +74,7 @@ void world() {
 	float viewplane_dis = 1.0;
 	float viewplane_scale[] = {g_Width / 480.0, g_Height / 480.0};
 	int num_point_light = 2, num_direct_light = 2;
-	float point_light[] = {-20, 20, -20, 20, 20, -20};
+	float point_light[] = {20, 20, -20, -20, 20, -20};
 	float direct_light[] = {0.4 / sqrt(1.32), -1 / sqrt(1.32), -0.4 / sqrt(1.32), -0.4 / sqrt(1.32), -1 / sqrt(1.32), -0.4 / sqrt(1.32)};
 	float point_light_color[] = {300, 0, 0, 300, 0, 0};
 	float direct_light_color[] = {0.0,0.3, 0, 0, 0.3, 0};
