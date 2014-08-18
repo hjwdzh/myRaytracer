@@ -24,6 +24,12 @@ uniform int num_triangles;
 uniform int num_object;
 uniform sampler1D matIndexSampler;
 
+//bvh
+uniform int num_bvh;
+uniform sampler1D minCoordSampler;
+uniform sampler1D maxCoordSampler;
+uniform sampler1D bvhIndexSampler;
+
 //Lights
 uniform vec3 point_lights[LIGHT_SIZE];
 uniform vec3 point_lights_color[LIGHT_SIZE];

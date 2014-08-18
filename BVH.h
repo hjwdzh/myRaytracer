@@ -96,6 +96,39 @@ public:
 
       return ret_val;
    }
+   int count() {
+      if (is_leaf)
+         return 1;
+      return 1 + left->count() + right->count();
+   }
+   float scan_data(vector<float>& min_coord, vector<float>& max_coord, 
+      vector<float>& bvh_index, int start, float* start_index) {
+      min_coord[start * 3] = bbox.mins()[0];
+      min_coord[start * 3 + 1] = bbox.mins()[1];
+      min_coord[start * 3 + 2] = bbox.mins()[2];
+      max_coord[start * 3] = bbox.maxs()[0];
+      max_coord[start * 3 + 1] = bbox.maxs()[1];
+      max_coord[start * 3 + 2] = bbox.maxs()[2];
+      if (is_leaf) {
+         bvh_index[start * 2] = -1;
+         bvh_index[start * 2 + 1] = index - start_index;
+         return start + 1;
+      } else {
+         bvh_index[start * 2] = start + 1;
+         bvh_index[start * 2 + 1] = left->scan_data(min_coord, max_coord, bvh_index, start + 1, start_index);
+         return right->scan_data(min_coord, max_coord, bvh_index, bvh_index[start * 2 + 1], start_index);
+      }
+   }
+   int generate_data(vector<float>& min_coord, vector<float>& max_coord, 
+      vector<float>& bvh_index, float* start_index)
+   {
+      int s = count();
+      min_coord.resize(s * 3);
+      max_coord.resize(s * 3);
+      bvh_index.resize(s * 2);
+      scan_data(min_coord, max_coord, bvh_index, 0, start_index);
+      return s;
+   }
    BBox bbox;
    float *index;
    int material;
