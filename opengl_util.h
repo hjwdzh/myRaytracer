@@ -35,3 +35,15 @@ GLuint create_texture(float* data, int number) {
 
     return texture_handle;
 }
+
+GLuint create_index_texture(int* data, int number) {
+	GLuint texture_handle;
+    glGenTextures(1, &texture_handle);
+    glBindTexture(GL_TEXTURE_1D, texture_handle);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_R32I, number, 0, GL_RED, GL_INT, data);
+ 
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    return texture_handle;
+}

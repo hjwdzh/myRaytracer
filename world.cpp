@@ -7,7 +7,7 @@
 #include <fstream>
 #define SAMPLE_SIZE 4
 
-GLuint mesh_texture, normal_texture, material_texture;
+GLuint mesh_texture, normal_texture, material_texture, mat_index_texture;
 int num_triangles, num_object;
 float* samples;
 extern int g_Width, g_Height;
@@ -21,7 +21,7 @@ void generate_geometries(vector<Geometry*>& geometries) {
 	float* vertex_buffer = new float[num_triangles * 9];
 	float* normal_buffer = new float[num_triangles * 9];
 	float* material = new float[13 * num_object];
-	int* mat_index = new int[num_triangles];
+	float* mat_index = new float[num_triangles];
 	float *v_ptr = vertex_buffer, *n_ptr = normal_buffer, 
 		  *m_ptr = material;
 	int s = 0;
@@ -48,6 +48,7 @@ void generate_geometries(vector<Geometry*>& geometries) {
 	mesh_texture = create_texture(vertex_buffer, num_triangles * 9);
 	normal_texture = create_texture(normal_buffer, num_triangles * 9);
 	material_texture = create_texture(material, 13 * num_object);
+	mat_index_texture = create_texture(mat_index, num_triangles);
 	delete[] vertex_buffer;
 	delete[] normal_buffer;
 	delete[] material;
@@ -58,11 +59,12 @@ void init_scene() {
 	if (initialized)
 		return;
 	vector<Geometry*> geometries;
-	Geometry* g = new Geometry("cube.obj");
+	Geometry* g = new Geometry("cube.obj",0,0,0);
+	Geometry* g1 = new Geometry("plane.obj");
 //	g->Translate(glm::vec3(1,1,1));
 //	g->Rotate(90, glm::vec3(1/sqrt(3),1/sqrt(3),1/sqrt(3)));
 	geometries.push_back(g);
-	geometries.push_back(new Geometry("plane.obj"));
+	geometries.push_back(g1);
 	generate_geometries(geometries);
 	samples = create_sampler(SAMPLE_SIZE);
 	initialized = true;
@@ -103,5 +105,8 @@ void world() {
 	glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_1D, material_texture);
 	int_to_uniform(2, "materialSampler");
+	glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_1D, mat_index_texture);
+	int_to_uniform(3, "matIndexSampler");
 	int_to_uniform(num_object, "num_object");
 }

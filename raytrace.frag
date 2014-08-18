@@ -19,7 +19,10 @@ uniform sampler1D meshSampler;
 uniform sampler1D normalSampler;
 uniform sampler1D materialSampler;
 uniform int num_triangles;
+
+//Object
 uniform int num_object;
+uniform sampler1D matIndexSampler;
 
 //Lights
 uniform vec3 point_lights[LIGHT_SIZE];
@@ -105,7 +108,7 @@ int shadow_ray(vec3 ray_o_o, vec3 ray_t_o, float depth) {
 	return 0;
 }
 
-float tracing(vec3 ray_o_o, vec3 ray_t_o, inout int tri, inout int obj, inout vec3 normal) {
+float tracing(vec3 ray_o_o, vec3 ray_t_o, inout int tri, inout float obj, inout vec3 normal) {
 	float depth = 1e30;
 	int j = 0;
 	float step = 1 / (9.0 * num_triangles);
@@ -139,7 +142,7 @@ float tracing(vec3 ray_o_o, vec3 ray_t_o, inout int tri, inout int obj, inout ve
 		float t = rayIntersectsTriangle(ray_o, ray_t, v1, v2, v3, u, v);
 		if (t > 0 && t < depth) {
 			depth = t;
-			obj = k;
+			obj = texture1D(matIndexSampler, (j+0.5)/num_triangles).r;
 			tri = j;
 			vec3 n1 = vec3(texture1D(normalSampler,i).r, texture1D(normalSampler,i+step).r, texture1D(normalSampler,i+2*step).r);
 			vec3 n2 = vec3(texture1D(normalSampler,i+3*step).r, texture1D(normalSampler,i+4*step).r, texture1D(normalSampler,i+5*step).r);
@@ -153,10 +156,10 @@ float tracing(vec3 ray_o_o, vec3 ray_t_o, inout int tri, inout int obj, inout ve
 	return depth;
 }
 
-vec3 lighting(vec3 point, vec3 normal, int tri_index, int obj_index) {
-	float kd = texture1D(materialSampler, (obj_index+0.5/13)/num_object).r;
-	float ks = texture1D(materialSampler, (obj_index+1.5/13)/num_object).r;
-	float k3 = texture1D(materialSampler, (obj_index+2.5/13)/num_object).r;
+vec3 lighting(vec3 point, vec3 normal, int tri_index, float obj_index) {
+	float kd = texture1D(materialSampler, (obj_index)/num_object).r;
+	float ks = texture1D(materialSampler, (obj_index+1.0/13)/num_object).r;
+	float k3 = texture1D(materialSampler, (obj_index+2.0/13)/num_object).r;
 	vec3 color = vec3(1,1,1) * ambient;
 	vec3 eye_dir = normalize(camera - point);
 	if (dot(eye_dir,normal) < 0)
@@ -195,7 +198,8 @@ void main() {
 	vec3 camera_x = cross(camera_lookat, camera_up);
 	vec3 normal = vec3(0,0,0);
 	for (int i = 0; i < SAMPLE_SIZE; ++i) {
-		int tri_index, obj_index;
+		int tri_index;
+		float obj_index;
 		vec2 p = pixel * viewplane_scale + samples[i] / (480.0 * viewplane_scale);
 		vec3 ray_t = normalize(viewplane_dis * camera_lookat+p.x*camera_x+p.y*camera_up);
 		float depth = tracing(ray_o, ray_t, tri_index, obj_index, normal);

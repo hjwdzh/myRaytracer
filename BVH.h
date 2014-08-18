@@ -42,16 +42,15 @@ class BVH
 public:
    BVH()
    {}
-   BVH(float* vertices, int* indices) {
+   BVH(float* vertices) {
       bbox = BBox(vertices);
       is_leaf = 1;
       index = vertices;
-      material = indices[0];
    }
-   BVH(float* vertices, float* normals, int* indices, int num, int dim = 0)
+   BVH(float* vertices, float* normals, float* indices, int num, int dim = 0)
    {
       if (num == 1) {
-            *this = BVH(vertices, indices);
+            *this = BVH(vertices);
             return;
       }
 
@@ -68,7 +67,7 @@ public:
       left  = new BVH(vertices, normals, indices, mid_point, (dim + 1) % 3);
       right = new BVH(vertices + 9 * mid_point, normals + 9 * mid_point, indices + mid_point, num - mid_point, (dim + 1) % 3);
    }
-   int qsplit(float* vertices, float* normals, int* indices, int size, float pivot_val, int axis)
+   int qsplit(float* vertices, float* normals, float* indices, int size, float pivot_val, int axis)
    {
       BBox bbox;
       float centroid;
