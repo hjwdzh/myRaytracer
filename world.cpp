@@ -54,7 +54,7 @@ void generate_geometries(vector<Geometry*>& geometries) {
 }
 
 void init_scene() {
-	static bool initialized = false;
+	static bool initialized =  false;
 	if (initialized)
 		return;
 	vector<Geometry*> geometries;
