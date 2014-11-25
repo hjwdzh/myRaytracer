@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <string>
 #include <cstring>
-
+#include <fstream>
+#include <iostream>
 #include "objloader.h"
 
 // Very, VERY simple OBJ loader.
@@ -54,7 +55,6 @@ bool loadOBJ(
 		}else if ( strcmp( lineHeader, "vt" ) == 0 ){
 			vec2 uv;
 			fscanf(file, "%f %f\n", &uv.x, &uv.y );
-			uv.y = -uv.y; // Invert V coordinate since we will only use DDS texture, which are inverted. Remove if you want to use TGA or BMP loaders.
 			temp_uvs.push_back(uv);
 		}else if ( strcmp( lineHeader, "vn" ) == 0 ){
 			vec3 normal;
@@ -126,6 +126,5 @@ bool loadOBJ(
 		else
 			out_normals.push_back(temp_normals[normalIndices[i]-1]);
 	}
-
 	return true;
 }

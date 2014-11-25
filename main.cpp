@@ -3,12 +3,23 @@
 #include "shader.h"
 #include "world.h"
 #include "glm/glm.hpp"
+#include "opengl_util.h"
+#include "texture.h"
+#include "sampler.h"
+#include <sys/time.h>
 using namespace std;
 
-int g_Width = 600, g_Height = 480;
-float g_nearPlane = 0.1, g_farPlane = 5000;
+#define SAMPLE_SIZE 8
 
-glm::vec3 camera(0,0,-5), camera_up(0,1,0), camera_lookat(0,0,1);
+int g_Width = 600, g_Height = 480, use_bvh = 0, g_frame = 0;
+float g_nearPlane = 0.1, g_farPlane = 5000;
+bool rot = false, start_rendering = false;
+GLuint renderTexture = -1;
+GLubyte* renderData, *data;
+extern float* samples;
+extern int tex[1];
+
+glm::vec3 camera(0,0,-3), camera_up(0,1,0), camera_lookat(0,0,1);
 
 struct timeval last_idle_time, time_now;
 enum {
@@ -18,7 +29,57 @@ enum {
     MENU_EXIT
 };
 
-GLuint programID;
+GLuint programID, simpleID;
+
+void DrawTextHHL(const char* text, float x, float y)
+{
+    const char* c = text;
+    
+    // 设置字体颜色
+    glColor3f(1.0, 1.0, 0.0);
+    
+    /*
+     * 设置正投影
+     */
+    
+    glMatrixMode(GL_PROJECTION);
+    
+    // 保存当前投影矩阵
+    glPushMatrix();
+    
+    glLoadIdentity();
+    gluOrtho2D( 0, g_Width, 0, g_Height );
+    
+    // 反转Y轴（朝下为正方向）(与窗口坐标一致)
+    glScalef(1, -1, 1);
+    // 将原点移动到屏幕左上方(与窗口坐标一致)
+    glTranslatef(0, -g_Height, 0);
+    glMatrixMode(GL_MODELVIEW);
+    
+    // 保存当前模型视图矩阵
+    glPushMatrix();
+    glLoadIdentity();
+    
+    // 设置文字位置
+    glRasterPos2f( x, y );
+    
+    // 依次描绘所有字符(使用显示列表)
+    for( ; *c != '\0'; c++)
+    {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+    
+    // 恢复之前保存的模型视图矩阵
+    glPopMatrix();
+    
+    glMatrixMode(GL_PROJECTION);
+    
+    // 恢复之前保存的投影矩阵
+    glPopMatrix();
+    
+    // 返回模型视图矩阵状态
+    glMatrixMode(GL_MODELVIEW);
+}
 
 void RenderObjects(void)
 {
@@ -42,7 +103,9 @@ void display(void)
    // Render the scene
    RenderObjects();
    // Make sure changes appear onscreen
-   glutSwapBuffers();
+   glFlush();
+   glFinish();
+   start_rendering = true;
 }
 
 void reshape(GLint width, GLint height)
@@ -65,7 +128,58 @@ void MouseMotion(int x, int y)
 
 void Simulate_To_Frame(float t)
 {
+    if (start_rendering) {
+      start_rendering = false;
+      if (g_frame == 0) {
+        renderData = new GLubyte[3 * g_Width * g_Height];
+        data = new GLubyte[3 * g_Width * g_Height];
+        memset(renderData, 0, sizeof(3 * g_Width * g_Height));
+      }
+      if (t < 1 / 60.0) {
+        sleep(1 / 60.0 - t);
+      }
+      data = grab(0, data);
+      for (int i = 0; i < 3 * g_Width * g_Height; ++i) {
+        renderData[i] = (g_frame * (0.0+renderData[i]) + data[i] + 0.0) / (g_frame + 1);
+      }
+      g_frame++;
+      glUseProgram(simpleID);
+      // Create one OpenGL texture
+      if ((int)renderTexture == -1)
+          glGenTextures(1, &renderTexture);
+      
+      glBindTexture(GL_TEXTURE_2D, renderTexture);
 
+      // Give the image to OpenGL
+      glTexImage2D(GL_TEXTURE_2D, 0,GL_RGB, g_Width, g_Height, 0, GL_BGR, GL_UNSIGNED_BYTE, renderData);
+
+      // ... nice trilinear filtering.
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); 
+      glGenerateMipmap(GL_TEXTURE_2D);
+
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, renderTexture);
+      int_to_uniform(0, "renderSampler", simpleID);
+      glClear( GL_COLOR_BUFFER_BIT );
+      glBegin(GL_QUADS);
+        glVertex3d(-1,-1,0);
+        glVertex3d(-1,1,0);
+        glVertex3d(1,1,0);
+        glVertex3d(1,-1,0);
+      glEnd();
+      glUseProgram(0);
+      char buffer[20];
+      sprintf(buffer, "fps %.02f", 1 / t);
+      DrawTextHHL(buffer, g_Width * 0.8, 20);
+      glutSwapBuffers();
+    }
+    if (g_frame % (SAMPLE_SIZE*SAMPLE_SIZE) == 0) {
+        delete[] samples;
+        samples = create_sampler(SAMPLE_SIZE);
+    }
 }
 
 void AnimateScene(void)
@@ -78,13 +192,16 @@ void AnimateScene(void)
 #else
   // Figure out time elapsed since last call to idle function
   struct timeval time_now;
-//  gettimeofday(&time_now, NULL);
+  gettimeofday(&time_now, NULL);
   dt = (float)(time_now.tv_sec  - last_idle_time.tv_sec) +
   1.0e-6*(time_now.tv_usec - last_idle_time.tv_usec);
-#endif
-  Simulate_To_Frame(dt);
-  // Save time_now for next time
   last_idle_time = time_now;
+#endif
+  static int an = 0;
+  if (an < 2)
+    an++;
+  if (an == 2)
+    Simulate_To_Frame(dt);
   // Force redraw
   glutPostRedisplay();
 }
@@ -130,7 +247,7 @@ void Keyboard(unsigned char key, int x, int y)
     camera_lookat = glm::normalize(camera_lookat - (float)(tan(5 / 180.0 * 3.1415926)) * camera_x);
     break;
   case 'f':
-    camera = camera + 0.1f * camera_lookat;
+    camera = camera + 10.0f * camera_lookat;
     break;
   case 'b':
     camera = camera - 0.1f * camera_lookat;
@@ -156,6 +273,9 @@ void Keyboard(unsigned char key, int x, int y)
   case 't':
 	  SelectFromMenu(MENU_TEXTURING);
 	  break;
+  case 'r':
+    rot = !rot;
+    break;
   }
 }
 
@@ -172,6 +292,9 @@ int BuildPopupMenu (void)
 
 int main(int argc, char** argv)
 {
+  if (argc >= 2 && strcmp(argv[1], "-bvh") == 0) {
+    use_bvh = 1;
+  }
   // GLUT Window Initialization:
   glutInit (&argc, argv);
   glutInitWindowSize (g_Width, g_Height);
@@ -191,6 +314,7 @@ int main(int argc, char** argv)
   // Get the initial time, for use by animation
   // Turn the flow of control over to GLUT
   programID = LoadShaders( "raytrace.vert", "raytrace.frag" );
+  simpleID = LoadShaders("render.vert", "render.frag");
   glutMainLoop ();
   return 0;
 }
