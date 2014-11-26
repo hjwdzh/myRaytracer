@@ -1,0 +1,128 @@
+camera
+	-pos 0 15 -12
+	-up 0 1 0
+	-lookat 0 0 1
+
+ambient 
+	1.0 1.0 1.0
+
+direct_light
+	-dir 0.5774 -0.5774 0.5774
+	-color 0.5 0.5 0.5
+
+direct_light
+	-dir -0.5774 -0.5774 -0.5774
+	-color 0.5 0.5 0.5
+
+point_light
+	-pos -20 20 5
+	-color 1 1 1
+
+plane.obj
+	-kd 0
+	-ks 0
+	-scale 2000 1 -2000
+	-rotate y 270
+	-offset 0 -1450 0
+	-tex sky_bottom.bmp
+
+plane.obj
+	-kd 0
+	-ks 0
+	-scale 2000 -1 2000
+	-rotate y -90
+	-offset 0 2450 0
+	-tex sky_top.bmp
+
+plane.obj
+	-kd 0
+	-ks 0
+	-scale 2000 1 2000
+	-rotate y 180
+	-rotate x 90
+	-offset 0 500 1950
+	-tex sky_front.bmp
+
+plane.obj
+	-kd 0
+	-ks 0
+	-scale 2000 1 2000
+	-rotate y -90
+	-rotate z -90
+	-offset 1950 500 0
+	-tex sky_left.bmp
+
+plane.obj
+	-kd 0
+	-ks 0
+	-scale 2000 1 2000
+	-rotate y 90
+	-rotate z 90
+	-offset -1950 500 0
+	-tex sky_right.bmp
+
+plane.obj
+	-kd 0
+	-ks 0
+	-scale -2000 1 2000
+	-rotate y 180
+	-rotate x 90
+	-offset 0 500 -1950
+	-tex sky_back.bmp
+
+ground.obj
+	-ka 0.3
+	-ks 1
+	-alpha 1
+	-offset 0 0 0
+	-tex board.bmp
+
+rsphere.obj
+	-ka 0
+	-kr 1.0
+	-kf 0.0
+	-alpha 100
+	-scale 5 5 5
+	-offset 3 15 10
+	-tex blue.bmp
+
+rsphere.obj
+	-ka 0
+	-kd 0
+	-ks 0.0
+	-kr 1.0
+	-kf 1.0
+	-nr 1.1
+	-alpha 100
+	-scale 5 5 5
+	-offset -9 15 13
+	-tex blue.bmp
+
+cube.obj
+	-ka 0.5
+	-ks 1.0
+	-alpha 20
+	-scale 5 5 5
+	-rotate y 30
+	-offset 3 5 10
+	-tex iron.bmp
+
+cube.obj
+	-ka 0.5
+	-ks 1.0
+	-alpha 20
+	-scale 5 5 5
+	-rotate y 30
+	-offset -9 5 13
+	-tex iron.bmp
+
+mirror.obj
+	-ka 0.0
+	-kr 1.0
+	-ks 0
+	-rotate x 90
+	-rotate y 60
+	-rotate z 30
+	-scale 30 30 30
+	-offset 20 3 28
+	-tex iron.bmp

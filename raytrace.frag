@@ -2,9 +2,10 @@
 
 #define SAMPLE_SIZE 64
 #define LIGHT_SIZE 64
-#define TEXTURE_SIZE 64
-#define MATERIAL_LEN 16
+#define TEXTURE_SIZE 9
+#define MATERIAL_LEN 21
 #define BVH_LEN 100
+#define PATH_DEPTH 5
 
 //Samplers
 
@@ -18,13 +19,13 @@ uniform float viewplane_dis;
 uniform vec2 viewplane_scale;
 
 //Texture
-uniform sampler2D renderSampler;
+uniform sampler2D renderSampler[TEXTURE_SIZE];
 
 //Mesh
 uniform sampler2D meshSampler;
 uniform sampler2D normalSampler;
 uniform sampler1D samples;
-// kd, ks, k3, offset(3), rotate(3), scale(3), next_object
+// kd, ks, tex, offset(3), rotate(3), scale(3), next_object
 uniform sampler2D materialSampler;
 uniform sampler2D texSampler;
 uniform sampler1D indexSampler;
@@ -34,7 +35,7 @@ uniform int num_triangles;
 uniform int num_object;
 uniform int num_bvh;
 uniform int use_bvh;
-
+uniform int use_path;
 
 //Lights
 uniform vec3 point_lights[LIGHT_SIZE];
@@ -228,54 +229,6 @@ float bvh_intersect(vec3 ray_o, vec3 ray_t, inout float index, inout float u, in
 	return depth;
 }
 
-int shadow_ray(vec3 ray_o_o, vec3 ray_t_o, float depth) {
-	float vstep = 1.0 / num_triangles;
-	float step = 1 / 9.0;
-	float i = step / 2;
-	int j = 0;
-	for (int k = 0; k < num_object; ++k) {
-	  float x1 = texture2D(materialSampler,vec2(3.5/MATERIAL_LEN,(k+0.5)/num_object)).r;
-	  float x2 = texture2D(materialSampler,vec2(4.5/MATERIAL_LEN,(k+0.5)/num_object)).r;
-	  float x3 = texture2D(materialSampler,vec2(5.5/MATERIAL_LEN,(k+0.5)/num_object)).r;
-	  vec3 a = vec3(texture2D(materialSampler,vec2(6.5/MATERIAL_LEN,(k+0.5)/num_object)).r,
-		  				texture2D(materialSampler,vec2(7.5/MATERIAL_LEN,(k+0.5)/num_object)).r,
-		  				texture2D(materialSampler,vec2(8.5/MATERIAL_LEN,(k+0.5)/num_object)).r);
-	  vec3 b = vec3(texture2D(materialSampler,vec2(9.5/MATERIAL_LEN,(k+0.5)/num_object)).r,
-						texture2D(materialSampler,vec2(10.5/MATERIAL_LEN,(k+0.5)/num_object)).r,
-		  				texture2D(materialSampler,vec2(11.5/MATERIAL_LEN,(k+0.5)/num_object)).r);
-	  vec3 c = cross(a,b);
-
-	  vec3 sv = vec3(texture2D(materialSampler,vec2(12.5/MATERIAL_LEN,(k+0.5)/num_object)).r,
-						texture2D(materialSampler,vec2(13.5/MATERIAL_LEN,(k+0.5)/num_object)).r,
-		  				texture2D(materialSampler,vec2(14.5/MATERIAL_LEN,(k+0.5)/num_object)).r);
-
-	  mat4 rotate = mat4(vec4(a,0),vec4(b,0),vec4(c,0),vec4(0,0,0,1));
-	  mat4 convert = mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0), vec4(x1,x2,x3,1)) 
-	  			   * rotate 
-	  			   * mat4(vec4(sv.x,0,0,0),vec4(0,sv.y,0,0),vec4(0,0,sv.z,0),vec4(0,0,0,1));
-	  mat4 inv_convert = mat4(vec4(1/sv.x,0,0,0),vec4(0,1/sv.y,0,0),vec4(0,0,1/sv.z,0),vec4(0,0,0,1))
-	  				   * transpose(rotate) 
-	  				   * mat4(vec4(1,0,0,0),vec4(0,1,0,0),vec4(0,0,1,0),vec4(-x1,-x2,-x3,1));
-
-  	  vec3 ray_o = (inv_convert * vec4(ray_o_o,1)).xyz;
-      vec3 ray_t = (inv_convert * vec4(ray_t_o,0)).xyz;	  
-
-	  float next_object = texture2D(materialSampler,vec2(15.5/MATERIAL_LEN,(k+0.5)/num_object)).r;
-	  while (j < next_object) {
-		vec3 v1 = vec3(texture2D(meshSampler,vec2(0.5*step,i)).r, texture2D(meshSampler,vec2(1.5*step,i)).r, texture2D(meshSampler,vec2(2.5*step,i)).r);
-		vec3 v2 = vec3(texture2D(meshSampler,vec2(3.5*step,i)).r, texture2D(meshSampler,vec2(4.5*step,i)).r, texture2D(meshSampler,vec2(5.5*step,i)).r);
-		vec3 v3 = vec3(texture2D(meshSampler,vec2(6.5*step,i)).r, texture2D(meshSampler,vec2(7.5*step,i)).r, texture2D(meshSampler,vec2(8.5*step,i)).r);
-		float u, v;
-		float t = rayIntersectsTriangle(ray_o, ray_t, v1, v2, v3, u, v);
-		if (t > 0 && (depth < 0 || t * length(convert * vec4(ray_t,0)) < depth))
-			return 1;
-		i += vstep;
-		j += 3;
-	  }
-	}
-	return 0;
-}
-
 float bvh_tracing(vec3 ray_o, vec3 ray_t, inout float tri, inout float obj, inout vec3 hit_point, inout vec2 uv, inout vec3 normal) {
 	float u, v, tri_ind;
 	float depth = 1e30;
@@ -283,7 +236,7 @@ float bvh_tracing(vec3 ray_o, vec3 ray_t, inout float tri, inout float obj, inou
 	if (depth > 1e20)
 		return depth;
 	tri = tri_ind;
-	obj = texture1D(indexSampler, (tri_ind + 0.5) / num_object).r;
+	obj = texture1D(indexSampler, (tri_ind + 0.5) / num_triangles).r;
 	hit_point = ray_o + depth * ray_t;
 	float i = (tri_ind + 0.5) / num_triangles;
 	float step = 1 / 9.0 ;
@@ -300,21 +253,24 @@ float bvh_tracing(vec3 ray_o, vec3 ray_t, inout float tri, inout float obj, inou
 	return depth;
 }
 
-vec3 bvh_lighting(vec3 point, vec3 normal, float tri_index, vec2 uv, float obj_index) {
+vec3 bvh_lighting(vec3 start_camera, vec3 point, vec3 normal, float tri_index, vec2 uv, float obj_index, inout vec3 orig_color) {
 	float kd = texture2D(materialSampler, vec2(0.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
 	float ks = texture2D(materialSampler, vec2(1.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
-	float k3 = texture2D(materialSampler, vec2(2.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
-	vec3 color = texture2D(renderSampler, uv).rgb * ambient;
-	vec3 eye_dir = normalize(camera - point);
+	float ka = texture2D(materialSampler, vec2(16.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
+	float alpha = texture2D(materialSampler, vec2(20.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
+	int tex = int(0.1+texture2D(materialSampler, vec2(2.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r);
+	orig_color = texture2D(renderSampler[tex], uv).rgb;
+	vec3 color = ka * orig_color * ambient;
+	vec3 eye_dir = normalize(start_camera - point);
 	float t1,t2,t3;
 	for (int i = 0; i < num_direct_light; ++i) {
 		float intensity = dot(-direct_lights[i], normal) * dot(eye_dir, normal);
 		if (intensity < 0)
 			continue;
 		float dep = bvh_intersect(point, -direct_lights[i], t1,t2,t3);
-		if (dep < 1e20)
+		if (dep < 1000)
 			continue;
-		color += intensity * (texture2D(renderSampler, uv).rgb * direct_lights_color[i]*kd
+		color += intensity * (orig_color * direct_lights_color[i]*kd
 			+ clamp(pow(dot(reflect(direct_lights[i], normal),eye_dir),20),0,1) * ks * direct_lights_color[i]);
 	}
 	for (int i = 0; i < num_point_light; ++i) {
@@ -329,13 +285,13 @@ vec3 bvh_lighting(vec3 point, vec3 normal, float tri_index, vec2 uv, float obj_i
 		if (dep < length(dis))
 			continue;
 		vec3 para = kd * l * point_lights_color[i];
-		color = color + intensity * (texture2D(renderSampler, uv).rgb * para
-			+ clamp(pow(dot(reflect(dis, normal),eye_dir),20),0,1) * ks * point_lights_color[i]);
+		color = color + intensity * (orig_color * para
+			+ clamp(pow(dot(reflect(dis, normal),eye_dir),alpha),0,1) * ks * point_lights_color[i]);
 	}
 	return color;
 }
 
-float tracing(vec3 ray_o_o, vec3 ray_t_o, inout float tri, inout float obj, inout vec3 hit_point, inout vec2 uv, inout vec3 normal) {
+float tracing(vec3 ray_o_o, vec3 ray_t_o, float shadow, inout float tri, inout float obj, inout vec3 hit_point, inout vec2 uv, inout vec3 normal) {
 	float depth = 1e30;
 	int j = 0;
 	float step = 1 / 9.0;
@@ -381,17 +337,23 @@ float tracing(vec3 ray_o_o, vec3 ray_t_o, inout float tri, inout float obj, inou
 		float t = rayIntersectsTriangle(ray_o, ray_t, v1, v2, v3, u, v);
 		if (t > 0 && t < depth) {
 			depth = t;
-			obj = k;
-			tri = j;
-			vec3 n1 = vec3(texture2D(normalSampler,vec2(0.5*step,i)).r, texture2D(normalSampler,vec2(1.5*step,i)).r, texture2D(normalSampler,vec2(2.5*step,i)).r);
-			vec3 n2 = vec3(texture2D(normalSampler,vec2(3.5*step,i)).r, texture2D(normalSampler,vec2(4.5*step,i)).r, texture2D(normalSampler,vec2(5.5*step,i)).r);
-			vec3 n3 = vec3(texture2D(normalSampler,vec2(6.5*step,i)).r, texture2D(normalSampler,vec2(7.5*step,i)).r, texture2D(normalSampler,vec2(8.5*step,i)).r);
-			normal = (convert * vec4(u * (n2 - n1) + v * (n3 - n1) + n1,0)).xyz;
 			hit_point = (convert * vec4(ray_o + ray_t * depth,1)).xyz;
-			vec2 uv1 = vec2(texture2D(texSampler, vec2(tex_step * 0.5, i)).r, texture2D(texSampler, vec2(tex_step * 1.5, i)).r);
-			vec2 uv2 = vec2(texture2D(texSampler, vec2(tex_step * 2.5, i)).r, texture2D(texSampler, vec2(tex_step * 3.5, i)).r);
-			vec2 uv3 = vec2(texture2D(texSampler, vec2(tex_step * 4.5, i)).r, texture2D(texSampler, vec2(tex_step * 5.5, i)).r);
-			uv = uv1 + u * (uv2 - uv1) + v * (uv3 - uv1);
+			if (shadow >= 0) {
+				if (t < shadow) {
+					return t;
+				}
+			} else {
+				obj = k;
+				tri = j;
+				vec3 n1 = vec3(texture2D(normalSampler,vec2(0.5*step,i)).r, texture2D(normalSampler,vec2(1.5*step,i)).r, texture2D(normalSampler,vec2(2.5*step,i)).r);
+				vec3 n2 = vec3(texture2D(normalSampler,vec2(3.5*step,i)).r, texture2D(normalSampler,vec2(4.5*step,i)).r, texture2D(normalSampler,vec2(5.5*step,i)).r);
+				vec3 n3 = vec3(texture2D(normalSampler,vec2(6.5*step,i)).r, texture2D(normalSampler,vec2(7.5*step,i)).r, texture2D(normalSampler,vec2(8.5*step,i)).r);
+				normal = (convert * vec4(u * (n2 - n1) + v * (n3 - n1) + n1,0)).xyz;
+				vec2 uv1 = vec2(texture2D(texSampler, vec2(tex_step * 0.5, i)).r, texture2D(texSampler, vec2(tex_step * 1.5, i)).r);
+				vec2 uv2 = vec2(texture2D(texSampler, vec2(tex_step * 2.5, i)).r, texture2D(texSampler, vec2(tex_step * 3.5, i)).r);
+				vec2 uv3 = vec2(texture2D(texSampler, vec2(tex_step * 4.5, i)).r, texture2D(texSampler, vec2(tex_step * 5.5, i)).r);
+				uv = uv1 + u * (uv2 - uv1) + v * (uv3 - uv1);
+			}
 		}
 		i += vstep;
 		j += 3;
@@ -401,36 +363,79 @@ float tracing(vec3 ray_o_o, vec3 ray_t_o, inout float tri, inout float obj, inou
 	return depth;
 }
 
-vec3 lighting(vec3 point, vec3 normal, float tri_index, vec2 uv, float obj_index) {
+vec3 lighting(vec3 start_camera, vec3 point, vec3 normal, float tri_index, vec2 uv, float obj_index, inout vec3 orig_color) {
 	float kd = texture2D(materialSampler, vec2(0.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
 	float ks = texture2D(materialSampler, vec2(1.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
-	float k3 = texture2D(materialSampler, vec2(2.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
-	vec3 color = texture2D(renderSampler, uv).rgb * ambient;
-	vec3 eye_dir = normalize(camera - point);
+	float ka = texture2D(materialSampler, vec2(16.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
+	float alpha = texture2D(materialSampler, vec2(20.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
+	int tex = int(0.1+texture2D(materialSampler, vec2(2.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r);
+	orig_color = texture2D(renderSampler[tex], uv).rgb;
+	vec3 color = ka * orig_color * ambient;
+	vec3 eye_dir = normalize(start_camera - point);
+	float t1, t2;
+	vec2 v1;
+	vec3 v2,v3;
 	for (int i = 0; i < num_direct_light; ++i) {
 		float intensity = dot(-direct_lights[i], normal) * dot(eye_dir, normal);
 		if (intensity < 0)
 			continue;
-		if (shadow_ray(point, -direct_lights[i], -1) == 1)
+		float depth = tracing(point, -direct_lights[i], 100, t1, t2, v2,v1, v3);
+		if (depth < 1000)
 			continue;
-		color += intensity * (texture2D(renderSampler, uv).rgb * direct_lights_color[i]*kd
+		color += intensity * (orig_color * direct_lights_color[i]*kd
 			+ clamp(pow(dot(reflect(direct_lights[i], normal),eye_dir),20),0,1) * ks * direct_lights_color[i]);
 	}
 	for (int i = 0; i < num_point_light; ++i) {
 		vec3 dis = point - point_lights[i];
-		float l = 1 / (length(dis));
-		l = l * l;
+		float len = length(dis);
+		float l = 1 / (len * len);
 		dis = normalize(dis);
 		float intensity = dot(-dis, normal) * dot(eye_dir, normal);
 		if (intensity < 0)
 			continue;
-		if (shadow_ray(point, -dis, length(dis)) == 1)
+		float depth = tracing(point, -dis, len, t1, t2, v2,v1, v3);
+		if (depth < len)
 			continue;
 		vec3 para = kd * l * point_lights_color[i];
-		color = color + intensity * (texture2D(renderSampler, uv).rgb * para
-			+ clamp(pow(dot(reflect(dis, normal),eye_dir),20),0,1) * ks * point_lights_color[i]);
+		color = color + intensity * (orig_color * para
+			+ clamp(pow(dot(reflect(dis, normal),eye_dir),alpha),0,1) * ks * point_lights_color[i]);
 	}
 	return color;
+}
+
+float extract_reflection(float obj_index) {
+	return texture2D(materialSampler, vec2(17.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;	
+}
+
+float rand(vec2 co){
+  return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+vec3 phoneSample(vec3 ray_t, vec3 normal, float alpha) {
+	float sample_id = texture1D(samples, (SAMPLE_SIZE*2+0.5)/(SAMPLE_SIZE*2+2)).r;
+	vec2 noises;
+	if (sample_id < 0) {
+		noises.x = texture1D(samples, (0.5) / (SAMPLE_SIZE*2+2)).r;
+		noises.y = texture1D(samples, (1.5) / (SAMPLE_SIZE*2+2)).r;
+	} else {
+		noises.x = texture1D(samples, (0.5 + 2 * sample_id) / (SAMPLE_SIZE*2+2)).r;
+		noises.y = texture1D(samples, (1.5 + 2 * sample_id) / (SAMPLE_SIZE*2+2)).r;	
+	}
+	bool terminate = false;
+	vec3 n = ray_t - 2 * dot(ray_t, normal) * normal;
+	float theta = acos(sqrt(1 - noises.x));
+	float phi = 2.0 * 3.1415926535897932384626433832795 * noises.y;
+	float xs = sin(theta) * pow(cos(phi), alpha);
+	float ys = cos(theta);
+	float zs = sqrt(1 - xs * xs - ys * ys);
+	vec3 h = vec3(4.4857, 8.58343, 2.4375);
+	vec3 x = normalize(cross(h,n));
+	vec3 z = normalize(cross(x,n));
+	vec3 d = xs * x + ys * n + zs * z;
+	if (dot(d,normal) < 0) {
+		d = n;
+	}
+	return normalize(d);
 }
 
 void main() {
@@ -441,44 +446,148 @@ void main() {
 	vec3 hit_point = vec3(0,0,0);
 	vec2 uv;
 	float sample_id = texture1D(samples, (SAMPLE_SIZE*2+0.5)/(SAMPLE_SIZE*2+2)).r;
-	vec2 noise;
-	noise.x = texture1D(samples, (2 * sample_id + 0.5) / (SAMPLE_SIZE*2+2)).r;
-	noise.y = texture1D(samples, (2 * sample_id + 1.5) / (SAMPLE_SIZE*2+2)).r;
+	int path_state[PATH_DEPTH];
+	float mat_stack[PATH_DEPTH];
+	vec3 light_stack[PATH_DEPTH];
+	vec3 color_stack[PATH_DEPTH];
+	vec3 from_stack[PATH_DEPTH];
+	vec3 to_stack[PATH_DEPTH];
+	vec3 normal_stack[PATH_DEPTH];
+	int node = 0;
+	vec3 orig_color;
 	if (sample_id < 0) {
 		for (int i = 0; i < SAMPLE_SIZE; ++i) {
 			float tri_index, obj_index;
+			vec2 noise;
+			noise.x = texture1D(samples, (2 * i + 0.5) / (SAMPLE_SIZE*2+2)).r;
+			noise.y = texture1D(samples, (2 * i + 1.5) / (SAMPLE_SIZE*2+2)).r;
 			vec2 p = pixel * viewplane_scale + noise / (480.0 * viewplane_scale);
 			vec3 ray_t = normalize(viewplane_dis * camera_lookat+p.x*camera_x+p.y*camera_up);
 			float depth = 0;
 			if (use_bvh == 1)
 				depth = bvh_tracing(ray_o, ray_t, tri_index, obj_index, hit_point, uv, normal);
 			else
-				depth = tracing(ray_o, ray_t, tri_index, obj_index, hit_point, uv, normal);
+				depth = tracing(ray_o, ray_t, 0, tri_index, obj_index, hit_point, uv, normal);
 			normal = vec3(0,0,-1);
 			if (depth < 1e20) {
 				if (use_bvh == 1)
-					color += bvh_lighting(hit_point, normal, tri_index, uv, obj_index);
+					color += bvh_lighting(camera, hit_point, normal, tri_index, uv, obj_index, orig_color);
 				else
-					color += lighting(hit_point, normal, tri_index, uv, obj_index);
+					color += lighting(camera, hit_point, normal, tri_index, uv, obj_index, orig_color);
 			}
 		}
 		gl_FragColor.rgb = color / SAMPLE_SIZE;
 	} else {
 		float tri_index, obj_index;
+
+		vec2 noise;
+		noise.x = texture1D(samples, (2 * sample_id + 0.5) / (SAMPLE_SIZE*2+2)).r;
+		noise.y = texture1D(samples, (2 * sample_id + 1.5) / (SAMPLE_SIZE*2+2)).r;
 		vec2 p = pixel * viewplane_scale + noise / (480.0 * viewplane_scale);
 		vec3 ray_t = normalize(viewplane_dis * camera_lookat+p.x*camera_x+p.y*camera_up);
-		float depth = 1e30;
-		if (use_bvh == 1)
-			depth = bvh_tracing(ray_o, ray_t, tri_index, obj_index, hit_point, uv, normal);
-		else
-			depth = tracing(ray_o, ray_t, tri_index, obj_index, hit_point, uv, normal);
-		if (depth < 1e20) {
-			if (use_bvh == 1)
-				color += bvh_lighting(hit_point, normal, tri_index, uv, obj_index);
-			else
-				color += lighting(hit_point, normal, tri_index, uv, obj_index);
+		path_state[node] = 0;
+		from_stack[node] = ray_o;
+		to_stack[node] = ray_t;
+		color_stack[node] = vec3(0,0,0);
+		light_stack[node] = vec3(0,0,0);
+		float nr;
+		int hit_mat = 0;
+		while (node >= 0) {
+			if (path_state[node] == 0) {
+				path_state[node] = 1;
+				float depth;
+				if (use_bvh == 1)
+					depth = bvh_tracing(from_stack[node], to_stack[node], tri_index, obj_index, hit_point, uv, normal);
+				else
+					depth = tracing(from_stack[node], to_stack[node], -1, tri_index, obj_index, hit_point, uv, normal);
+				if (depth < 1e20) {
+					if (use_bvh == 1)
+						light_stack[node] = bvh_lighting(from_stack[node], hit_point, normal, tri_index, uv, obj_index, orig_color);
+					else
+						light_stack[node] = lighting(from_stack[node], hit_point, normal, tri_index, uv, obj_index, orig_color);
+					color_stack[node] = orig_color;
+					normal_stack[node] = normal;
+					ray_t = to_stack[node];
+					to_stack[node] = hit_point;
+					mat_stack[node] = obj_index;
+					float kr = extract_reflection(obj_index);
+					if (kr > 0 && node < PATH_DEPTH - 1) {
+						node += 1;
+						path_state[node] = 0;
+						from_stack[node] = hit_point;
+						to_stack[node] = ray_t - 2 * dot(ray_t, normal) * normal;
+						light_stack[node] = vec3(0,0,0);
+						continue;
+					}
+				} else {
+					path_state[node] = 3;
+				}
+			}
+			if (path_state[node] == 1) {
+				path_state[node] = 2;
+				obj_index = mat_stack[node];
+				float kf = texture2D(materialSampler, vec2(18.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
+				if (kf > 0 && node < PATH_DEPTH - 1) {
+					nr = texture2D(materialSampler, vec2(19.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
+					normal = normal_stack[node];
+					ray_t = normalize(to_stack[node] - from_stack[node]);
+					float cost = dot(normal, ray_t);
+					if (cost < 0) {
+						nr = 1 / nr;
+						cost = -cost;
+					} else {
+						normal = -normal;
+					}
+					float rootContent = 1 - nr * nr * (1 - cost * cost);
+					if (rootContent >= 0) {
+						rootContent = sqrt(rootContent);
+						node += 1;
+						path_state[node] = 0;
+						from_stack[node] = to_stack[node - 1];
+						to_stack[node] = (nr * cost - rootContent) * normal + nr * ray_t;
+						light_stack[node] = vec3(0,0,0);
+						continue;
+					}
+				}
+			}
+			if (path_state[node] == 2) {
+				path_state[node] = 3;
+				obj_index = mat_stack[node];
+				float ks = texture2D(materialSampler, vec2(1.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
+				if (hit_mat < use_path && node < PATH_DEPTH - 1 && ks > 0) {
+					normal = normal_stack[node];
+					ray_t = normalize(to_stack[node] - from_stack[node]);
+					float alpha = texture2D(materialSampler, vec2(20.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
+					hit_mat += 1;
+					node += 1;
+					path_state[node] = 0;
+					from_stack[node] = to_stack[node - 1];
+					to_stack[node] = phoneSample(ray_t, normal, alpha);
+					continue;
+				}
+			}
+			if (path_state[node] == 3) {
+				if (node == 0)
+					break;
+				float obj_index = mat_stack[node - 1];
+				if (path_state[node - 1] == 1) {
+					light_stack[node - 1] += extract_reflection(obj_index) * color_stack[node - 1] * light_stack[node];
+				}
+				else
+				if (path_state[node - 1] == 2) {
+					light_stack[node - 1] += texture2D(materialSampler, vec2(18.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r * color_stack[node - 1] * light_stack[node];
+				}
+				else {
+					hit_mat -= 1;
+					normal = normal_stack[node - 1];
+					ray_t = normalize(to_stack[node - 1] - from_stack[node - 1]);
+					float alpha = texture2D(materialSampler, vec2(20.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r;
+					light_stack[node - 1] += texture2D(materialSampler, vec2(1.5/MATERIAL_LEN,(obj_index+0.5)/num_object)).r * color_stack[node - 1] * light_stack[node] * dot(-ray_t, normal);
+				}
+				node -= 1;
+			}
 		}
-		gl_FragColor.rgb = color;
+		gl_FragColor.rgb = light_stack[0];
 	}
 	gl_FragColor.a = 1;
 }

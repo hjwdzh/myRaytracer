@@ -4,6 +4,9 @@
 extern int g_Width;
 extern int g_Height;
 
+map<string,GLuint> TexManager::nameManager;
+vector<GLuint> TexManager::texResource;
+
 GLuint loadBMP_custom(const char * imagepath){
 
 	printf("Reading image %s\n", imagepath);
@@ -68,8 +71,8 @@ GLuint loadBMP_custom(const char * imagepath){
 	delete [] data;
 
 	// Poor filtering, or ...
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); 
+//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+//	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); 
 
 	// ... nice trilinear filtering.
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -110,7 +113,7 @@ GLubyte* grab(const char* img_path, GLubyte* pPixelData)
         GL_BGR_EXT, GL_UNSIGNED_BYTE, pPixelData);
 
     if (img_path) {
-	    pDummyFile = fopen("leather.bmp", "rb");
+	    pDummyFile = fopen("help.bmp", "rb");
 	    if( pDummyFile == 0 )
 	        exit(0);
 

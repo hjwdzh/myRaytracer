@@ -6,7 +6,9 @@ using namespace std;
 float* create_sampler(int size) {
 	srand((unsigned)time(0));
 	float* sampler = new float[size * size * 2 + 2];
-	int block = size * size;
+	for (int i = 0; i < size * size * 2; ++i)
+		sampler[i] = (rand()+0.0) / RAND_MAX;
+/*	int block = size * size;
 	for (int i = 0; i < size; ++i)
 		for (int j = 0; j < size; ++j) {
 			sampler[(i*size+j)<<1] = ((j+0.0)+(i+0.0)/size)/size + (rand()+0.0) / RAND_MAX / block;
@@ -20,7 +22,8 @@ float* create_sampler(int size) {
 			sampler[(k << 1) + i] = temp;
 		}
 	}
-	sampler[size*size*2-2] = -1;
+*/	sampler[size*size*2-2] = -1;
 	sampler[size*size*2-1] = -1;
+
 	return sampler;
 }

@@ -5,6 +5,9 @@
 #include <fstream>
 #include <iostream>
 #include "objloader.h"
+#include "geometry.h"
+#include "texture.h"
+#include "light.h"
 
 // Very, VERY simple OBJ loader.
 // Here is a short list of features a real function would provide : 
@@ -15,6 +18,9 @@
 // - More stable. Change a line in the OBJ file and it crashes.
 // - More secure. Change another line and you can inject code.
 // - Loading from memory, stream, etc
+
+extern Light lights;
+extern glm::vec3 camera, camera_up, camera_lookat;
 
 bool loadOBJ(
 	const char * path, 
@@ -125,6 +131,210 @@ bool loadOBJ(
 			out_normals .push_back(ave_normals[ vertexIndex-1 ]);
 		else
 			out_normals.push_back(temp_normals[normalIndices[i]-1]);
+	}
+	return true;
+}
+
+bool loadScene(
+	const char * path, vector<Geometry*>& geometries
+) {
+	std::ifstream is(path);
+	char buffer[200];
+	Geometry* c = 0;
+	while (is >> buffer) {
+		if (strcmp(buffer, "camera") == 0) {
+			int tmp = 0;
+			while (tmp != 7) {
+				is >> buffer;
+				if (strcmp(buffer, "-pos") == 0) {
+					tmp += 1;
+					is >> buffer;
+					sscanf(buffer, "%f", &camera.x);
+					is >> buffer;
+					sscanf(buffer, "%f", &camera.y);
+					is >> buffer;
+					sscanf(buffer, "%f", &camera.z);
+				} else
+				if (strcmp(buffer, "-up") == 0) {
+					tmp += 2;
+					is >> buffer;
+					sscanf(buffer, "%f", &camera_up.x);
+					is >> buffer;
+					sscanf(buffer, "%f", &camera_up.y);
+					is >> buffer;
+					sscanf(buffer, "%f", &camera_up.z);
+				} else
+				if (strcmp(buffer, "-lookat") == 0) {
+					tmp += 4;
+					is >> buffer;
+					sscanf(buffer, "%f", &camera_lookat.x);
+					is >> buffer;
+					sscanf(buffer, "%f", &camera_lookat.y);
+					is >> buffer;
+					sscanf(buffer, "%f", &camera_lookat.z);
+				} else
+				return false;
+			}
+			continue;
+		}
+		if (strcmp(buffer, "ambient") == 0) {
+			is >> buffer;
+			sscanf(buffer, "%f", &lights.ambient.x);
+			is >> buffer;
+			sscanf(buffer, "%f", &lights.ambient.y);
+			is >> buffer;
+			sscanf(buffer, "%f", &lights.ambient.z);
+			continue;
+		}
+		if (strcmp(buffer, "direct_light") == 0) {
+			int tmp = 0;
+			while (tmp != 3) {
+				is >> buffer;
+				if (strcmp(buffer, "-dir") == 0) {
+					tmp += 1;
+					vec3 dir;
+					is >> buffer;
+					sscanf(buffer, "%f", &dir.x);
+					is >> buffer;
+					sscanf(buffer, "%f", &dir.y);
+					is >> buffer;
+					sscanf(buffer, "%f", &dir.z);
+					lights.direct_light_dir.push_back(dir);
+				} else
+				if (strcmp(buffer, "-color") == 0) {
+					tmp += 2;
+					vec3 color;
+					is >> buffer;
+					sscanf(buffer, "%f", &color.x);
+					is >> buffer;
+					sscanf(buffer, "%f", &color.y);
+					is >> buffer;
+					sscanf(buffer, "%f", &color.z);
+					lights.direct_light_color.push_back(color);					
+				} else {
+					return false;
+				}
+			}
+			continue;
+		}
+		if (strcmp(buffer, "point_light") == 0) {
+			int tmp = 0;
+			while (tmp != 3) {
+				is >> buffer;
+				if (strcmp(buffer, "-pos") == 0) {
+					tmp += 1;
+					vec3 dir;
+					is >> buffer;
+					sscanf(buffer, "%f", &dir.x);
+					is >> buffer;
+					sscanf(buffer, "%f", &dir.y);
+					is >> buffer;
+					sscanf(buffer, "%f", &dir.z);
+					lights.point_light_pos.push_back(dir);
+				} else
+				if (strcmp(buffer, "-color") == 0) {
+					tmp += 2;
+					vec3 color;
+					is >> buffer;
+					sscanf(buffer, "%f", &color.x);
+					is >> buffer;
+					sscanf(buffer, "%f", &color.y);
+					is >> buffer;
+					sscanf(buffer, "%f", &color.z);
+					lights.point_light_color.push_back(color);					
+				} else {
+					return false;
+				}
+			}
+			continue;
+		}
+		if (buffer[0] != '-') {
+			c = new Geometry((string("obj/")+buffer).c_str());
+			geometries.push_back(c);
+			continue;
+		}
+		if (!c) {
+			cout << "Wrong format!\n";
+			return false;
+		}
+		if (strcmp(buffer, "-kd") == 0) {
+			is >> buffer;
+			sscanf(buffer, "%f", &c->kd);
+			continue;
+		}
+		if (strcmp(buffer, "-ks") == 0) {
+			is >> buffer;
+			sscanf(buffer, "%f", &c->ks);
+			continue;
+		}
+		if (strcmp(buffer, "-ka") == 0) {
+			is >> buffer;
+			sscanf(buffer, "%f", &c->ka);
+			continue;
+		}
+		if (strcmp(buffer, "-kr") == 0) {
+			is >> buffer;
+			sscanf(buffer, "%f", &c->kr);
+			continue;
+		}
+		if (strcmp(buffer, "-kf") == 0) {
+			is >> buffer;
+			sscanf(buffer, "%f", &c->kf);
+			continue;
+		}
+		if (strcmp(buffer, "-alpha") == 0) {
+			is >> buffer;
+			sscanf(buffer, "%f", &c->alpha);
+			continue;
+		}
+		if (strcmp(buffer, "-nr") == 0) {
+			is >> buffer;
+			sscanf(buffer, "%f", &c->nr);
+			continue;
+		}
+		if (strcmp(buffer, "-tex") == 0) {
+			is >> buffer;
+			c->tex = TexManager::createRenderTexture(buffer);
+			continue;
+		}
+		if (strcmp(buffer, "-offset") == 0) {
+			float x, y, z;
+			is >> buffer;
+			sscanf(buffer, "%f", &x);
+			is >> buffer;
+			sscanf(buffer, "%f", &y);
+			is >> buffer;
+			sscanf(buffer, "%f", &z);
+			c->translate(x, y, z);
+			continue;
+		}
+		if (strcmp(buffer, "-scale") == 0) {
+			float x, y, z;
+			is >> buffer;
+			sscanf(buffer, "%f", &x);
+			is >> buffer;
+			sscanf(buffer, "%f", &y);
+			is >> buffer;
+			sscanf(buffer, "%f", &z);
+			c->scale(x, y, z);
+			continue;
+		}
+		if (strcmp(buffer, "-rotate") == 0) {
+			is >> buffer;
+			glm::vec3 axis;
+			if (buffer[0] == 'x')
+				axis = glm::vec3(1,0,0);
+			else
+			if (buffer[0] == 'y')
+				axis = glm::vec3(0,1,0);
+			else
+				axis = glm::vec3(0,0,1);
+			is >> buffer;
+			float angle;
+			sscanf(buffer, "%f", &angle);
+			c->rotation(axis, angle);
+			continue;
+		}
 	}
 	return true;
 }

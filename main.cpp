@@ -11,15 +11,16 @@ using namespace std;
 
 #define SAMPLE_SIZE 8
 
-int g_Width = 600, g_Height = 480, use_bvh = 0, g_frame = 0;
+int g_Width = 600, g_Height = 480, use_bvh = 0, use_path = 0, g_frame = 0;
 float g_nearPlane = 0.1, g_farPlane = 5000;
 bool rot = false, start_rendering = false;
 GLuint renderTexture = -1;
 GLubyte* renderData, *data;
+char* output_file = 0, *input_file = 0;
 extern float* samples;
 extern int tex[1];
 
-glm::vec3 camera(0,0,-3), camera_up(0,1,0), camera_lookat(0,0,1);
+glm::vec3 camera(0,0,0), camera_up(0,1,0), camera_lookat = glm::normalize(glm::vec3(0,-1,1));
 
 struct timeval last_idle_time, time_now;
 enum {
@@ -101,7 +102,8 @@ void display(void)
    // Set up viewing transformation, looking down -Z axis
    glLoadIdentity();
    // Render the scene
-   RenderObjects();
+   if (g_frame != (SAMPLE_SIZE*SAMPLE_SIZE))
+      RenderObjects();
    // Make sure changes appear onscreen
    glFlush();
    glFinish();
@@ -174,11 +176,20 @@ void Simulate_To_Frame(float t)
       char buffer[20];
       sprintf(buffer, "fps %.02f", 1 / t);
       DrawTextHHL(buffer, g_Width * 0.8, 20);
+      if (g_frame > SAMPLE_SIZE * SAMPLE_SIZE)
+        sprintf(buffer, "Finish!\n");
+      else
+        sprintf(buffer, "Sampling %d/%d", g_frame + 1, SAMPLE_SIZE * SAMPLE_SIZE);
+      DrawTextHHL(buffer, g_Width * 0.75, 40);
       glutSwapBuffers();
     }
-    if (g_frame % (SAMPLE_SIZE*SAMPLE_SIZE) == 0) {
+    if (g_frame == (SAMPLE_SIZE * SAMPLE_SIZE)) {
         delete[] samples;
-        samples = create_sampler(SAMPLE_SIZE);
+        if (output_file) {
+          data = grab(output_file);
+          delete[] data;
+        }
+        exit(0);
     }
 }
 
@@ -292,8 +303,32 @@ int BuildPopupMenu (void)
 
 int main(int argc, char** argv)
 {
-  if (argc >= 2 && strcmp(argv[1], "-bvh") == 0) {
-    use_bvh = 1;
+  for (int i = 1; i < argc; ++i) {
+    if (strcmp(argv[i], "-help") == 0) {
+      cout << "./render (-path number) (-bvh) -input filename (-output filename)\n";
+      exit(0);
+    }
+    if (strcmp(argv[i], "-bvh") == 0) {
+      use_bvh = 1;
+    }
+    if (strcmp(argv[i], "-path") == 0) {
+      use_path = 1;
+    }
+    if (strcmp(argv[i - 1], "-path") == 0) {
+      sscanf(argv[i], "%d", &use_path);      
+    }
+    if (strcmp(argv[i - 1], "-output") == 0) {
+      output_file = new char[100];
+      strcpy(output_file, argv[i]);
+    }
+    if (strcmp(argv[i - 1], "-input") == 0) {
+      input_file = new char[100];
+      strcpy(input_file, argv[i]);      
+    }
+  }
+  if (input_file == 0) {
+    cout << "Please specify input scene file.\n";
+    exit(0);
   }
   // GLUT Window Initialization:
   glutInit (&argc, argv);
